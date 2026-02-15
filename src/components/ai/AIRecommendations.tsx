@@ -69,19 +69,19 @@ export default function AIRecommendations({
     );
   }
 
-  const handleAccept = (componentId: string, recommendationId: string) => {
+  const handleAccept = (componentId: string, recommendation_id: string) => {
     submitFeedback.mutate({
-      recommendationId,
-      wasAccepted: true,
+      recommendation_id,
+      was_accepted: true,
       user_id: '', // Get from auth context
     });
     onAcceptRecommendation?.(componentId);
   };
 
-  const handleReject = (recommendationId: string) => {
+  const handleReject = (recommendation_id: string) => {
     submitFeedback.mutate({
-      recommendationId,
-      wasAccepted: false,
+      recommendation_id,
+      was_accepted: false,
       user_id: '', // Get from auth context
     });
   };
