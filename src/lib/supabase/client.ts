@@ -1,37 +1,39 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Database } from "@/types/database.types";
+// ============================================
+// SUPABASE CLIENT
+// File: src/lib/supabase/client.ts
+// ============================================
 
-export class SupabaseClientSingleton {
-    private static instance: SupabaseClient<Database> | null = null;
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/types/database.types';
 
-    private constructor() {
-        // Private constructor to prevent direct instantiation
-    }
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-    public static getInstance(): SupabaseClient<Database> {
-        if (!this.instance) {
-            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-            const supabasekey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-            if (!supabaseUrl || !supabasekey) {
-                throw new Error("Missing Supabase environment variables");
-            }
-
-            this.instance = createClient<Database>(supabaseUrl, supabasekey, {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: true,
-                    }
-                });
-        }   
-
-        return this.instance;
-        }
-
-        public static resetInstance() {
-            this.instance = null;
-        }
+// Validate environment variables
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn(
+    'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.'
+  );
 }
-// Export convenience function
-export const getSupabaseClient = () => SupabaseClientSingleton.getInstance();
+
+// Create a single supabase client for interacting with your database
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
+
+/**
+ * Get the Supabase client instance
+ */
+export function getSupabaseClient() {
+  return supabase;
+}
+
+/**
+ * Check if Supabase is configured
+ */
+export function isSupabaseConfigured(): boolean {
+  return Boolean(supabaseUrl && supabaseAnonKey);
+}

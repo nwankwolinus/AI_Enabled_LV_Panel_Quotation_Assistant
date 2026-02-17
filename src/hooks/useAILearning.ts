@@ -1,5 +1,5 @@
 // ============================================
-// AI LEARNING - REACT HOOKS
+// AI LEARNING HOOKS
 // File: src/hooks/useAILearning.ts
 // ============================================
 
@@ -8,75 +8,124 @@ import { AILearningService } from '@/services/AILearningService';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import {
   ComponentRecommendationInput,
-  ComponentRecommendationOutput,
-  ComponentPairingRecommendation,
-  PricingOptimizationRecommendation,
-  RecommendationPerformance,
-  QuotePattern,
   AIFeedback,
 } from '@/types/ai-learning.types';
 import { useUIStore } from '@/store/useUIStore';
+import { useEffect, useState } from 'react';
 
-const aiService = AILearningService.getInstance(getSupabaseClient());
+// ============================================
+// AUTH STATE HOOK
+// ============================================
+
+/**
+ * Returns true once we know the user is logged in.
+ * Prevents AI hooks from firing before auth is resolved.
+ */
+function useIsAuthenticated(): boolean {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(session !== null);
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(session !== null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return isAuthenticated;
+}
 
 // ============================================
 // RECOMMENDATION HOOKS
 // ============================================
 
 /**
- * Get component recommendations
+ * Get component recommendations.
+ * Only runs when: user is authenticated + components exist.
  */
-export const useComponentRecommendations = (
+export function useComponentRecommendations(
   input: ComponentRecommendationInput,
-  enabled: boolean = true
-) => {
+  enabled = true
+) {
+  const isAuthenticated = useIsAuthenticated();
+  const supabase = getSupabaseClient();
+  const aiService = AILearningService.getInstance(supabase);
+
+  const hasComponents = (input.existing_components?.length ?? 0) > 0;
+  const shouldRun = enabled && isAuthenticated && hasComponents;
+
   return useQuery({
     queryKey: ['ai-recommendations', 'components', input],
     queryFn: () => aiService.getComponentRecommendations(input),
-    enabled: enabled && input.existing_components.length > 0,
+    enabled: shouldRun,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    retry: false, // Don't retry AI calls
   });
-};
+}
 
 /**
- * Get component pairing suggestions
+ * Get component pairing suggestions.
+ * Only runs when: user is authenticated + component IDs provided.
  */
-export const useComponentPairings = (componentIds: string[], enabled: boolean = true) => {
+export function useComponentPairings(componentIds: string[], enabled = true) {
+  const isAuthenticated = useIsAuthenticated();
+  const supabase = getSupabaseClient();
+  const aiService = AILearningService.getInstance(supabase);
+
+  const hasIds = (componentIds?.length ?? 0) > 0;
+  const shouldRun = enabled && isAuthenticated && hasIds;
+
   return useQuery({
     queryKey: ['ai-recommendations', 'pairings', componentIds],
     queryFn: () => aiService.getComponentPairings(componentIds),
-    enabled: enabled && componentIds.length > 0,
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    enabled: shouldRun,
+    staleTime: 1000 * 60 * 10,
+    retry: false,
   });
-};
+}
 
 /**
- * Get pricing optimization recommendations
+ * Get pricing optimisation for a quote.
+ * Only runs when: user is authenticated + valid quoteId.
  */
-export const usePricingOptimization = (quoteId: string, enabled: boolean = true) => {
+export function usePricingOptimization(quoteId: string, enabled = true) {
+  const isAuthenticated = useIsAuthenticated();
+  const supabase = getSupabaseClient();
+  const aiService = AILearningService.getInstance(supabase);
+
+  const shouldRun = enabled && isAuthenticated && Boolean(quoteId);
+
   return useQuery({
     queryKey: ['ai-recommendations', 'pricing', quoteId],
     queryFn: () => aiService.getPricingOptimizationRecommendations(quoteId),
-    enabled: enabled && !!quoteId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: shouldRun,
+    staleTime: 1000 * 60 * 5,
+    retry: false,
   });
-};
+}
 
 // ============================================
 // FEEDBACK HOOKS
 // ============================================
 
-/**
- * Submit feedback for a recommendation
- */
-export const useSubmitFeedback = () => {
+export function useSubmitFeedback() {
   const queryClient = useQueryClient();
   const { showToast } = useUIStore();
+  const supabase = getSupabaseClient();
+  const aiService = AILearningService.getInstance(supabase);
 
   return useMutation({
     mutationFn: ({ recommendation_id, was_accepted, feedback_text }: AIFeedback) =>
       aiService.recordFeedback(recommendation_id, was_accepted, feedback_text),
-    
+
     onSuccess: () => {
       showToast('Thank you for your feedback!', 'success');
       queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
@@ -87,72 +136,72 @@ export const useSubmitFeedback = () => {
       showToast('Failed to submit feedback', 'error');
     },
   });
-};
+}
 
 // ============================================
 // LEARNING HOOKS
 // ============================================
 
-/**
- * Learn from a quote
- */
-export const useLearnFromQuote = () => {
+export function useLearnFromQuote() {
   const queryClient = useQueryClient();
+  const supabase = getSupabaseClient();
+  const aiService = AILearningService.getInstance(supabase);
 
   return useMutation({
     mutationFn: (quoteId: string) => aiService.learnFromQuote(quoteId),
-    
     onSuccess: () => {
-      // Invalidate pattern-related queries
       queryClient.invalidateQueries({ queryKey: ['ai-patterns'] });
       queryClient.invalidateQueries({ queryKey: ['ai-recommendations'] });
     },
   });
-};
+}
 
 // ============================================
 // ANALYTICS HOOKS
 // ============================================
 
-/**
- * Get recommendation performance metrics
- */
-export const useRecommendationPerformance = (period: { from: string; to: string }) => {
+export function useRecommendationPerformance(period: { from: string; to: string }) {
+  const isAuthenticated = useIsAuthenticated();
+  const supabase = getSupabaseClient();
+  const aiService = AILearningService.getInstance(supabase);
+
   return useQuery({
     queryKey: ['ai-analytics', 'performance', period],
     queryFn: () => aiService.getRecommendationPerformance(period),
-    staleTime: 1000 * 60 * 15, // 15 minutes
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60 * 15,
+    retry: false,
   });
-};
+}
 
-/**
- * Get top performing patterns
- */
-export const useTopPerformingPatterns = (limit: number = 10) => {
+export function useTopPerformingPatterns(limit = 10) {
+  const isAuthenticated = useIsAuthenticated();
+  const supabase = getSupabaseClient();
+  const aiService = AILearningService.getInstance(supabase);
+
   return useQuery({
     queryKey: ['ai-analytics', 'top-patterns', limit],
     queryFn: () => aiService.getTopPerformingPatterns(limit),
-    staleTime: 1000 * 60 * 30, // 30 minutes
+    enabled: isAuthenticated,
+    staleTime: 1000 * 60 * 30,
+    retry: false,
   });
-};
+}
 
 // ============================================
 // COMPOSITE HOOKS
 // ============================================
 
-/**
- * Complete AI assistance for quote creation
- */
-export const useAIQuoteAssistant = (input: ComponentRecommendationInput) => {
+export function useAIQuoteAssistant(input: ComponentRecommendationInput) {
   const recommendations = useComponentRecommendations(input, true);
   const pairings = useComponentPairings(
-    input.existing_components.map(c => c.component_id),
-    input.existing_components.length > 0
+    input.existing_components?.map(c => c.component_id) ?? [],
+    (input.existing_components?.length ?? 0) > 0
   );
 
   return {
-    recommendations: recommendations.data,
-    pairings: pairings.data,
+    recommendations: recommendations.data ?? null,
+    pairings: pairings.data ?? [],
     isLoading: recommendations.isLoading || pairings.isLoading,
     error: recommendations.error || pairings.error,
     refetch: () => {
@@ -160,17 +209,14 @@ export const useAIQuoteAssistant = (input: ComponentRecommendationInput) => {
       pairings.refetch();
     },
   };
-};
+}
 
-/**
- * AI insights for existing quote
- */
-export const useAIQuoteInsights = (quoteId: string) => {
-  const pricingOpt = usePricingOptimization(quoteId, !!quoteId);
+export function useAIQuoteInsights(quoteId: string) {
+  const pricingOpt = usePricingOptimization(quoteId, Boolean(quoteId));
 
   return {
-    pricingOptimization: pricingOpt.data,
+    pricingOptimization: pricingOpt.data ?? null,
     isLoading: pricingOpt.isLoading,
     error: pricingOpt.error,
   };
-};
+}

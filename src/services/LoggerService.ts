@@ -1,93 +1,151 @@
+// ============================================
+// LOGGER SERVICE
+// File: src/services/LoggerService.ts
+// ============================================
+
 export enum LogLevel {
-    DEBUG = "DEBUG",
-    INFO = "INFO",
-    WARN = "WARN",
-    ERROR = "ERROR",
+  DEBUG = 'DEBUG',
+  INFO = 'INFO',
+  WARN = 'WARN',
+  ERROR = 'ERROR',
 }
 
-export interface LogEntry {
-    timestamp: Date;
-    level: LogLevel;
-    message: string;
-    context?: Record<string, any>;  
-    error?: Error; // Optional error object for ERROR level logs
+interface LogContext {
+  [key: string]: any;
 }
 
-export class LoggerService {
-    private static instance: LoggerService | null = null;
-    private logs: LogEntry[] = [];
-    private maxLogs: number = 1000; // Max logs to keep in memory
+class LoggerService {
+  private static instance: LoggerService;
 
-    private constructor() {}
+  private constructor() {}
 
-    public static getInstance(): LoggerService {
-        if (!this.instance) {
-            this.instance = new LoggerService();
-        }
-        return this.instance;
+  public static getInstance(): LoggerService {
+    if (!this.instance) {
+      this.instance = new LoggerService();
+    }
+    return this.instance;
+  }
+
+  private log(
+    level: LogLevel,
+    message: string,
+    context?: LogContext,
+    error?: Error | unknown
+  ): void {
+    const timestamp = new Date().toISOString();
+    const logMethod =
+      level === LogLevel.ERROR
+        ? console.error
+        : level === LogLevel.WARN
+        ? console.warn
+        : console.log;
+
+    // Format the log message
+    const logMessage = `[${timestamp}] [${level}] ${message}`;
+    
+    // Safely handle context
+    const safeContext = context ? this.sanitizeContext(context) : null;
+    
+    // Safely handle error
+    const safeError = error ? this.formatError(error) : null;
+
+    // Log based on what we have
+    if (safeContext && safeError) {
+      logMethod(logMessage, safeContext, safeError);
+    } else if (safeContext) {
+      logMethod(logMessage, safeContext);
+    } else if (safeError) {
+      logMethod(logMessage, safeError);
+    } else {
+      logMethod(logMessage);
     }
 
-    private log(level: LogLevel, message: string, context?: Record<string, any>, error?: Error): void {
-        const entry: LogEntry = {
-            timestamp: new Date(),
-            level,
-            message,
-            context,
-            error,
-        };
+    // In production, send to logging service (e.g., Sentry)
+    if (process.env.NODE_ENV === 'production' && level === LogLevel.ERROR) {
+      this.sendToExternalLogger(level, message, safeContext, safeError);
+    }
+  }
 
-        this.logs.push(entry);
+  /**
+   * Sanitize context to avoid circular references and undefined values
+   */
+  private sanitizeContext(context: LogContext): Record<string, any> {
+    try {
+      return JSON.parse(JSON.stringify(context, (key, value) => {
+        if (value === undefined) return null;
+        if (value === null) return null;
+        return value;
+      }));
+    } catch (error) {
+      return { error: 'Failed to sanitize context' };
+    }
+  }
 
-        // Keep only las maxLogs entries
-        if (this.logs.length > this.maxLogs) {
-            this.logs.shift();
-        }
-
-        // console output
-        const logMethod = level === LogLevel.ERROR ? console.error : level === LogLevel.WARN ? console.warn : console.log;
-
-        logMethod(`[${level}] ${message}`, context || '', error || '');
-
-        // In production, send to logging service (e.g., sentry)
-        if (process.env.NODE_ENV === "production" && level === LogLevel.ERROR) {
-            this.sendToExternalService(entry);
-        }
+  /**
+   * Format error object safely
+   */
+  private formatError(error: Error | unknown): Record<string, any> {
+    if (error instanceof Error) {
+      return {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      };
     }
 
-    public info(message: string, context?: Record<string, any>): void {
-        this.log(LogLevel.INFO, message, context);
+    if (typeof error === 'string') {
+      return { message: error };
     }
 
-    public error(message: string, context?: Record<string, any>, error?: Error): void {
-        this.log(LogLevel.ERROR, message, context, error);
+    if (typeof error === 'object' && error !== null) {
+      try {
+        return JSON.parse(JSON.stringify(error));
+      } catch {
+        return { message: String(error) };
+      }
     }
 
-    public debug(message: string, context?: Record<string, any>):
-    void {
-        this.log(LogLevel.DEBUG, message, context);
-    }
+    return { message: String(error) };
+  }
 
-    public warn(message: string, context?: Record<string, any>):
-    void {
-        this.log(LogLevel.WARN, message, context);
+  /**
+   * Send to external logging service
+   */
+  private sendToExternalLogger(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, any> | null,
+    error?: Record<string, any> | null
+  ): void {
+    // TODO: Implement integration with external logging service
+    // Example: Sentry, LogRocket, Datadog, etc.
+    /*
+    try {
+      Sentry.captureMessage(message, {
+        level: level.toLowerCase() as Sentry.SeverityLevel,
+        extra: { ...context, error },
+      });
+    } catch (err) {
+      console.error('Failed to send log to external service:', err);
     }
+    */
+  }
 
-    public getLogs(level?: LogLevel): LogEntry[] {
-        if (level) {
-            return this.logs.filter(log => log.level === level);
-        }
-        return [...this.logs];
-    }
+  public debug(message: string, context?: LogContext): void {
+    this.log(LogLevel.DEBUG, message, context);
+  }
 
-    public clearLogs(): void {
-        this.logs = [];
-    }
+  public info(message: string, context?: LogContext): void {
+    this.log(LogLevel.INFO, message, context);
+  }
 
-    private sendToExternalService(entry: LogEntry): void {
-        // Implement external logging service integration
-        // e.g., Sentry, LogRocket, etc.
-    }
+  public warn(message: string, context?: LogContext): void {
+    this.log(LogLevel.WARN, message, context);
+  }
+
+  public error(message: string, error: Error | unknown, context?: LogContext): void {
+    this.log(LogLevel.ERROR, message, context, error);
+  }
 }
 
-// Export convenience functions
 export const logger = LoggerService.getInstance();

@@ -219,6 +219,15 @@ export interface ComponentPairingPatternData {
   vendor_preference?: string;
 }
 
+export function isComponentPairingPatternData(value: unknown): value is ComponentPairingPatternData {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.main_component === 'object' &&
+    v.main_component !== null &&
+    typeof (v.main_component as Record<string, unknown>).id === 'string'
+  );
+}
 /**
  * Client Preference Pattern Data
  */
@@ -240,6 +249,16 @@ export interface ClientPreferencePatternData {
   common_project_types: string[];
 }
 
+export function isClientPreferencePatternData(value: unknown): value is ClientPreferencePatternData {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.client_id === 'string' &&
+    Array.isArray(v.preferred_manufacturers) &&
+    Array.isArray(v.preferred_vendors)
+  );
+}
+
 /**
  * Pricing Pattern Data
  */
@@ -254,6 +273,17 @@ export interface PricingPatternData {
   price_per_ampere?: number;
   currency: string;
   sample_size: number;
+}
+
+export function isPricingPatternData(value: unknown): value is PricingPatternData {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.amperage === 'string' &&
+    typeof v.category === 'string' &&
+    typeof v.average_price === 'number' &&
+    typeof v.currency === 'string'
+  );
 }
 
 /**
