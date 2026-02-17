@@ -1,0 +1,382 @@
+/* ============================================
+   GLOBAL STYLES
+   File: src/app/globals.css
+   Tailwind CSS v4
+   ============================================ */
+
+@import "tailwindcss";
+
+/* ============================================
+   CUSTOM THEME
+   ============================================ */
+
+@theme {
+  /* Brand Colors */
+  --color-ppl-navy: #1e3a8a;
+  --color-ppl-navy-50: #f0f4ff;
+  --color-ppl-navy-100: #dbe4ff;
+  --color-ppl-navy-200: #bfd3ff;
+  --color-ppl-navy-300: #93b4ff;
+  --color-ppl-navy-400: #6089ff;
+  --color-ppl-navy-500: #3b5bdb;
+  --color-ppl-navy-600: #1e3a8a;
+  --color-ppl-navy-700: #1a2e6e;
+  --color-ppl-navy-800: #152452;
+  --color-ppl-navy-900: #0f1a3a;
+
+  --color-ppl-red: #dc2626;
+  --color-ppl-red-50: #fef2f2;
+  --color-ppl-red-100: #fee2e2;
+  --color-ppl-red-200: #fecaca;
+  --color-ppl-red-300: #fca5a5;
+  --color-ppl-red-400: #f87171;
+  --color-ppl-red-500: #ef4444;
+  --color-ppl-red-600: #dc2626;
+  --color-ppl-red-700: #b91c1c;
+  --color-ppl-red-800: #991b1b;
+  --color-ppl-red-900: #7f1d1d;
+
+  --color-ppl-gold: #f59e0b;
+  --color-ppl-gold-50: #fffbeb;
+  --color-ppl-gold-100: #fef3c7;
+  --color-ppl-gold-200: #fde68a;
+  --color-ppl-gold-300: #fcd34d;
+  --color-ppl-gold-400: #fbbf24;
+  --color-ppl-gold-500: #f59e0b;
+  --color-ppl-gold-600: #d97706;
+  --color-ppl-gold-700: #b45309;
+  --color-ppl-gold-800: #92400e;
+  --color-ppl-gold-900: #78350f;
+  
+  /* Define gray colors for theme function */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+@layer base {
+  * {
+    border-color: var(--color-gray-200, #e5e7eb);
+  }
+
+  body {
+    background-color: var(--color-gray-50, #f9fafb);
+    color: var(--color-gray-900, #111827);
+  }
+
+  h1 {
+    font-size: var(--text-3xl, 1.875rem);
+    font-weight: var(--font-weight-bold, 700);
+    letter-spacing: var(--tracking-tight, -0.025em);
+  }
+
+  h2 {
+    font-size: var(--text-2xl, 1.5rem);
+    font-weight: var(--font-weight-semibold, 600);
+    letter-spacing: var(--tracking-tight, -0.025em);
+  }
+
+  h3 {
+    font-size: var(--text-xl, 1.25rem);
+    font-weight: var(--font-weight-semibold, 600);
+    letter-spacing: var(--tracking-tight, -0.025em);
+  }
+
+  h4 {
+    font-size: var(--text-lg, 1.125rem);
+    font-weight: var(--font-weight-semibold, 600);
+  }
+
+  h5 {
+    font-size: var(--text-base, 1rem);
+    font-weight: var(--font-weight-semibold, 600);
+  }
+
+  h6 {
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: var(--font-weight-semibold, 600);
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+@layer utilities {
+  /* Scrollbar styles */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background-color: var(--color-gray-100, #f3f4f6);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-300, #d1d5db);
+    border-radius: var(--radius-lg, 0.5rem);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-gray-400, #9ca3af);
+  }
+
+  /* Hide scrollbar */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Animations */
+  .animate-in {
+    animation: slideIn 0.2s ease-out;
+  }
+
+  .slide-in-from-bottom-5 {
+    animation: slideInFromBottom 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInFromBottom {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Text truncation */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    transition-property: all;
+    transition-duration: 200ms;
+  }
+  
+  .card-hover:hover {
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+    transform: translateY(-0.25rem);
+  }
+
+  /* Focus ring */
+  .focus-ring:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px white, 0 0 0 4px var(--color-ppl-navy);
+  }
+
+  /* Link styles */
+  .link {
+    color: var(--color-ppl-navy);
+    cursor: pointer;
+  }
+  
+  .link:hover {
+    text-decoration: underline;
+  }
+
+  /* Status badge base */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--radius-full, 9999px);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: var(--font-weight-medium, 500);
+  }
+}
+
+/* ============================================
+   FORM STYLES
+   ============================================ */
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-gray-700, #374151);
+}
+
+.form-input {
+  width: 100%;
+  border-radius: var(--radius-md, 0.375rem);
+  border-width: 1px;
+  border-color: var(--color-gray-300, #d1d5db);
+  padding: 0.5rem 0.75rem;
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.form-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px white, 0 0 0 4px var(--color-ppl-navy);
+  border-color: transparent;
+}
+
+.form-error {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-ppl-red);
+}
+
+.form-helper {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-gray-500, #6b7280);
+}
+
+/* ============================================
+   LOADING SPINNER
+   ============================================ */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   ============================================ */
+
+@media (max-width: 640px) {
+  .mobile-stack {
+    flex-direction: column;
+  }
+
+  .mobile-full {
+    width: 100%;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.skip-link:focus {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 50;
+  width: auto;
+  height: auto;
+  padding: 1rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  background-color: var(--color-ppl-navy);
+  color: white;
+  border-radius: var(--radius-md, 0.375rem);
+}
+
+/* Focus visible for keyboard navigation */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px white, 0 0 0 4px var(--color-ppl-navy);
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@page {
+  margin: 1cm;
+}
+
+@media print {
+  /* Combine duplicate .no-print rules */
+  nav,
+  aside,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    color: black;
+    background: white;
+  }
+
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  a[href]:after {
+    content: " (" attr(href) ")";
+  }
+}
