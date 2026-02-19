@@ -8,12 +8,16 @@
 import { Button } from '@/components';
 import Link from 'next/link';
 import { FileText, Package, Users, TrendingUp, Zap, Shield } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
+
+  const router = useRouter();
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-ppl-navy via-ppl-navy-800 to-ppl-navy-900 text-white">
+      <section className="bg-linear-to-br from-ppl-navy via-ppl-navy-800 to-ppl-navy-900 text-white">
         <div className="container mx-auto px-6 py-24">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-5xl md:text-6xl font-bold mb-6">
@@ -29,6 +33,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/login">
                 <Button 
+                  onClick={() => router.push('/auth/login')}
                   size="lg" 
                   className="bg-ppl-gold hover:bg-ppl-gold-600 text-ppl-navy-900 text-lg px-8"
                 >

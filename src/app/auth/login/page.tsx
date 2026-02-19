@@ -1,31 +1,48 @@
 // ============================================
-// LOGIN PAGE
+// LOGIN PAGE - WITH WORKING AUTH
 // File: src/app/auth/login/page.tsx
 // ============================================
 
 'use client';
 
 import { useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Label } from '@/components';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const supabase = createClient();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
-    // TODO: Implement actual authentication
-    setTimeout(() => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      console.log('Login successful!', data);
+      
+      // Redirect to dashboard
       router.push('/dashboard');
-    }, 1000);
+      router.refresh();
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message || 'Failed to login');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -43,16 +60,24 @@ export default function LoginPage() {
             <CardTitle className="text-2xl text-center">Sign In</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded text-sm">
+                  {error}
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
                   required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
+                  disabled={loading}
+                  autoComplete="email"
                 />
               </div>
 
@@ -62,9 +87,11 @@ export default function LoginPage() {
                   id="password"
                   type="password"
                   required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  disabled={loading}
+                  autoComplete="current-password"
                 />
               </div>
 
@@ -80,10 +107,10 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-ppl-navy"
-                disabled={isLoading}
+                className="w-full bg-ppl-navy hover:bg-ppl-navy-700"
+                disabled={loading}
               >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {loading ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
 
@@ -96,13 +123,13 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {/* Quick Demo Access */}
+        {/* Demo Credentials - Remove in production */}
         <div className="mt-6 text-center">
-          <Link href="/dashboard">
-            <Button variant="ghost" className="text-white hover:text-gray-200">
-              Continue to Demo Dashboard →
-            </Button>
-          </Link>
+          <p className="text-sm text-gray-300 mb-2">Demo Credentials:</p>
+          <div className="bg-gray-800 bg-opacity-50 rounded px-4 py-2 text-xs text-gray-300">
+            <p>Email: admin@powerprojects.ng</p>
+            <p>Password: admin123</p>
+          </div>
         </div>
       </div>
     </div>

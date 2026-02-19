@@ -9,8 +9,8 @@ import { DashboardLayout, Card, CardHeader, CardTitle, CardContent, Button } fro
 import { FileText, Package, Users, TrendingUp, Plus, ArrowUp, ArrowDown } from 'lucide-react';
 import Link from 'next/link';
 
-
 export default function DashboardPage() {
+
   // Mock data - replace with actual data from your API
   const stats = {
     totalQuotations: 124,

@@ -176,6 +176,7 @@ export interface ComponentFilters {
   type?: string | string[];
   min_price?: number;
   max_price?: number;
+  search?: string; // Alias for search_query
   search_query?: string;
   created_by?: string;
 }

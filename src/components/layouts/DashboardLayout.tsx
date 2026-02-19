@@ -1,49 +1,43 @@
 // ============================================
-// DASHBOARD LAYOUT
+// DASHBOARD LAYOUT - FIXED
 // File: src/components/layouts/DashboardLayout.tsx
 // ============================================
 
 'use client';
 
-import { useState } from 'react';
-import { cn } from '@/lib/utils';
+import { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { User } from '@/types/user.types';
+import { useAuth } from '@/hooks/useAuth';
+import { Loading } from '@/components';
 
 interface DashboardLayoutProps {
-  children: React.ReactNode;
-  user: User | null;
-  onLogout?: () => void;
+  children: ReactNode;
 }
 
-export default function DashboardLayout({
-  children,
-  user,
-  onLogout,
-}: DashboardLayoutProps) {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loading size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <Sidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-      />
+      <Sidebar />
 
       {/* Main Content */}
-      <div
-        className={cn(
-          'flex-1 flex flex-col transition-all duration-300',
-          isSidebarCollapsed ? 'ml-20' : 'ml-64'
-        )}
-      >
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header user={user} onLogout={onLogout} />
+        <Header />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
       </div>

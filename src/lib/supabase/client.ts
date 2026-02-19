@@ -1,39 +1,33 @@
 // ============================================
-// SUPABASE CLIENT
+// SUPABASE BROWSER CLIENT
 // File: src/lib/supabase/client.ts
 // ============================================
 
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/database.types';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+let client: ReturnType<typeof createBrowserClient<Database>> | undefined;
 
-// Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    'Missing Supabase environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.'
+export function createClient() {
+  if (client) return client;
+
+  client = createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+
+  return client;
 }
 
-// Create a single supabase client for interacting with your database
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
-
-/**
- * Get the Supabase client instance
- */
+// For backwards compatibility
+export const supabase = createClient();
 export function getSupabaseClient() {
-  return supabase;
+  return createClient();
 }
 
-/**
- * Check if Supabase is configured
- */
-export function isSupabaseConfigured(): boolean {
-  return Boolean(supabaseUrl && supabaseAnonKey);
-}
+// export function isSupabaseConfigured(): boolean {
+//   return Boolean(
+//     process.env.NEXT_PUBLIC_SUPABASE_URL &&
+//     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+//   );
+// }
