@@ -1,5 +1,5 @@
 // ============================================
-// DASHBOARD LAYOUT - FIXED
+// DASHBOARD LAYOUT - WITH COLLAPSIBLE SIDEBAR
 // File: src/components/layouts/DashboardLayout.tsx
 // ============================================
 
@@ -10,6 +10,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/hooks/useAuth';
 import { Loading } from '@/components';
+import { useUIStore } from '@/store/useUIStore';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -17,6 +18,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { loading } = useAuth();
+  const { isSidebarCollapsed } = useUIStore();
 
   if (loading) {
     return (
@@ -27,19 +29,34 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <Sidebar />
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Overlay */}
+      {!isSidebarCollapsed && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => useUIStore.getState().toggleSidebar()}
+        />
+      )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <Header />
+      <div className="flex h-screen">
+        {/* Sidebar */}
+        <Sidebar />
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+        {/* Main Content */}
+        <div
+          className={`
+            flex-1 flex flex-col overflow-hidden transition-all duration-300
+            ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}
+          `}
+        >
+          {/* Header */}
+          <Header />
+
+          {/* Page Content */}
+          <main className="flex-1 overflow-y-auto p-6">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   );

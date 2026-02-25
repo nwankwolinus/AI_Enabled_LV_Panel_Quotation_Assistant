@@ -180,20 +180,65 @@ export function useDeleteComponent() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // Check if component is used in any quotations
+      const { data: quotesUsingComponent, error: checkError } = await supabase
+        .from('quote_items')
+        .select('quote_id')
+        .or(`incomers.cs.{"component_id":"${id}"},outgoings.cs.{"component_id":"${id}"},accessories.cs.{"component_id":"${id}"}`)
+        .limit(1);
+
+      if (checkError) {
+        console.error('Error checking component usage:', checkError);
+        throw new Error('Failed to verify component usage');
+      }
+
+      // If component is used in quotations, prevent deletion
+      if (quotesUsingComponent && quotesUsingComponent.length > 0) {
+        throw new Error('COMPONENT_IN_USE');
+      }
+
+      // Delete the component
       const { error } = await supabase
         .from('components')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase delete error:', error);
+        
+        // Handle specific error codes
+        if (error.code === '23503') {
+          // Foreign key violation
+          throw new Error('COMPONENT_IN_USE');
+        }
+        
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['components'] });
       showToast('Component deleted successfully', 'success');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error deleting component:', error);
-      showToast('Failed to delete component', 'error');
+      
+      // Handle specific error types
+      if (error.message === 'COMPONENT_IN_USE') {
+        showToast(
+          'Cannot delete component: It is being used in one or more quotations',
+          'error'
+        );
+      } else if (error.code === '23503' || error.code === '409') {
+        showToast(
+          'Cannot delete component: It is referenced by existing quotations',
+          'error'
+        );
+      } else {
+        showToast(
+          `Failed to delete component: ${error.message || 'Unknown error'}`,
+          'error'
+        );
+      }
     },
   });
 }

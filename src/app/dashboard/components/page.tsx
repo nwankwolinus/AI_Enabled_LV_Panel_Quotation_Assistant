@@ -1,5 +1,5 @@
 // ============================================
-// COMPONENTS PAGE - COMPLETE
+// COMPONENTS PAGE - WITH EDIT
 // File: src/app/dashboard/components/page.tsx
 // ============================================
 
@@ -13,23 +13,26 @@ import {
   Input, 
   Select, 
   Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
 } from '@/components';
 import { Plus, Search, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import AddComponentModal from '@/components/forms/AddComponentModal';
+import EditComponentModal from '@/components/forms/EditComponentModal';
 import ImportComponentsModal from '@/components/forms/ImportComponentsModal';
-import { useComponents } from '@/hooks/useComponents';
+import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
 import { useUIStore } from '@/store/useUIStore';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
+const supabase = getSupabaseClient();
 export default function ComponentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
 
   const { showToast } = useUIStore();
+  const deleteComponent = useDeleteComponent();
 
   // Fetch components
   const { data: components, isLoading, refetch } = useComponents({
@@ -43,7 +46,6 @@ export default function ComponentsPage() {
       return;
     }
 
-    // Simple CSV export (upgrade to XLSX later)
     const headers = ['Vendor', 'Item', 'Model', 'Manufacturer', 'Price', 'Currency', 'Amperage', 'Poles', 'Category'];
     const csvContent = [
       headers.join(','),
@@ -72,22 +74,15 @@ export default function ComponentsPage() {
   };
 
   const handleDownloadTemplate = () => {
-    // Headers match your exact table structure
     const headers = ['vendor', 'item', 'model', 'manufacturer', 'price', 'currency', 'amperage', 'poles', 'type', 'specification', 'category'];
-    
-    // Example rows with realistic data
-    const examples = [
-      ['Schneider', 'ACB Masterpact MTZ3 4000A', 'MTZ3 4000A', 'Schneider Electric', '12000000', 'NGN', '4000A', '4P', 'Fixed', 'Draw-out type with electronic protection', 'ACB'],
-      ['ABB', 'MCCB Tmax T7 630A', 'T7 630A', 'ABB', '850000', 'NGN', '630A', '4P', 'Fixed', 'Thermal magnetic protection', 'MCCB'],
-      ['Schneider', 'MCB Acti 9 C63', 'C63A', 'Schneider Electric', '15000', 'NGN', '63A', '3P', 'Fixed', 'Thermal magnetic MCB', 'MCB'],
-    ];
+    const example = ['Schneider', 'ACB Masterpact MTZ3', 'MTZ3 4000A', 'Schneider Electric', '12000000', 'NGN', '4000A', '4P', 'Fixed', 'Draw-out type with microprocessor-based protection', 'ACB'];
     
     const csvContent = [
       headers.join(','),
-      ...examples.map(row => row.map(cell => `"${cell}"`).join(','))
+      example.join(',')
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -95,27 +90,50 @@ export default function ComponentsPage() {
     a.click();
     window.URL.revokeObjectURL(url);
 
-    showToast('Template downloaded - Fill in your data and import!', 'success');
+    showToast('Template downloaded', 'success');
   };
 
   const handleEdit = (id: string) => {
-    showToast('Edit functionality coming soon', 'info');
+    setEditingComponentId(id);
+    setIsEditModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this component?')) return;
+    // Check if component is used before asking for confirmation
+    const { data: quotesUsingComponent } = await supabase
+      .from('quote_items')
+      .select('quote_id, quotes!inner(quote_number, project_name)')
+      .or(`incomers.cs.{"component_id":"${id}"},outgoings.cs.{"component_id":"${id}"},accessories.cs.{"component_id":"${id}"}`)
+      .limit(5);
+
+    // Show different confirmation based on usage
+    if (quotesUsingComponent && quotesUsingComponent.length > 0) {
+      const quotesList = quotesUsingComponent
+        .map((q: any) => `- ${q.quotes?.quote_number}: ${q.quotes?.project_name}`)
+        .join('\n');
+      
+      const message = `⚠️ This component is currently used in ${quotesUsingComponent.length} quotation(s):\n\n${quotesList}\n\n❌ Cannot delete component while it's in use.\n\n💡 To delete this component, first remove it from all quotations.`;
+      
+      alert(message);
+      showToast('Component is being used in quotations', 'warning');
+      return;
+    }
+
+    // Standard confirmation if not in use
+    if (!confirm('Are you sure you want to delete this component? This action cannot be undone.')) {
+      return;
+    }
     
     try {
-      // TODO: Implement delete API call
-      showToast('Component deleted successfully', 'success');
+      await deleteComponent.mutateAsync(id);
       refetch();
     } catch (error) {
-      showToast('Failed to delete component', 'error');
+      // Error toast handled by hook
     }
   };
 
   return (
-    <DashboardLayout user={null} onLogout={() => {}}>
+    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -155,8 +173,12 @@ export default function ComponentsPage() {
             value={components?.filter(c => c.category === 'MCCB').length || 0} 
           />
           <StatCard 
+            label="MCBs" 
+            value={components?.filter(c => c.category === 'MCB').length || 0} 
+          />
+          <StatCard 
             label="Others" 
-            value={components?.filter(c => c.category !== 'ACB' && c.category !== 'MCCB').length || 0} 
+            value={components?.filter(c => c.category !== 'ACB' && c.category !== 'MCCB' && c.category !== 'MCB').length || 0} 
           />
         </div>
 
@@ -213,6 +235,20 @@ export default function ComponentsPage() {
         }}
       />
 
+      <EditComponentModal
+        isOpen={isEditModalOpen}
+        componentId={editingComponentId}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingComponentId(null);
+        }}
+        onSuccess={() => {
+          setIsEditModalOpen(false);
+          setEditingComponentId(null);
+          refetch();
+        }}
+      />
+
       <ImportComponentsModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
@@ -232,4 +268,4 @@ function StatCard({ label, value }: { label: string; value: number }) {
       <p className="text-2xl font-bold text-ppl-navy">{value}</p>
     </Card>
   );
-}
+} 
