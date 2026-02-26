@@ -1,5 +1,5 @@
 // ============================================
-// COMPONENTS TABLE
+// COMPONENTS TABLE - WITH BULK DELETE
 // File: src/components/tables/ComponentsTable.tsx
 // ============================================
 
@@ -27,6 +27,10 @@ interface ComponentsTableProps {
   onDelete?: (componentId: string) => void;
   onSelect?: (component: Component) => void;
   selectable?: boolean;
+  // Bulk selection props
+  isSelectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelection?: (id: string) => void;
 }
 
 export default function ComponentsTable({
@@ -36,6 +40,9 @@ export default function ComponentsTable({
   onDelete,
   onSelect,
   selectable,
+  isSelectionMode = false,
+  selectedIds = new Set(),
+  onToggleSelection,
 }: ComponentsTableProps) {
   if (isLoading) {
     return (
@@ -65,6 +72,12 @@ export default function ComponentsTable({
       <Table>
         <TableHeader>
           <TableRow>
+            {/* Checkbox column in selection mode */}
+            {isSelectionMode && (
+              <TableHead className="w-12">
+                <span className="sr-only">Select</span>
+              </TableHead>
+            )}
             <TableHead>Item</TableHead>
             <TableHead>Manufacturer</TableHead>
             <TableHead>Model</TableHead>
@@ -72,79 +85,113 @@ export default function ComponentsTable({
             <TableHead>Amperage</TableHead>
             <TableHead>Vendor</TableHead>
             <TableHead className="text-right">Price</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            {!isSelectionMode && <TableHead className="text-right">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {components.map((component) => (
-            <TableRow key={component.id}>
-              <TableCell className="font-medium max-w-xs">
-                <div className="truncate">{component.item}</div>
-              </TableCell>
-              
-              <TableCell>{component.manufacturer}</TableCell>
-              
-              <TableCell>{component.model}</TableCell>
-              
-              <TableCell>
-                {component.category && (
-                  <Badge variant="outline" className="text-xs">
-                    {component.category}
-                  </Badge>
+          {components.map((component) => {
+            const isSelected = selectedIds.has(component.id);
+            
+            return (
+              <TableRow 
+                key={component.id}
+                className={isSelected ? 'bg-blue-50 hover:bg-blue-100' : ''}
+              >
+                {/* Checkbox in selection mode */}
+                {isSelectionMode && (
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleSelection?.(component.id)}
+                      className="rounded border-gray-300 text-ppl-navy focus:ring-ppl-navy cursor-pointer h-4 w-4"
+                    />
+                  </TableCell>
                 )}
-              </TableCell>
-              
-              <TableCell>
-                {component.amperage || '-'}
-              </TableCell>
-              
-              <TableCell>{component.vendor}</TableCell>
-              
-              <TableCell className="text-right font-medium">
-                {formatCurrency(component.price, component.currency || 'NGN')}
-              </TableCell>
-              
-              <TableCell>
-                <div className="flex items-center justify-end gap-1">
-                  {selectable && onSelect && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onSelect(component)}
-                      title="Select Component"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
+                
+                <TableCell className="font-medium max-w-xs">
+                  <div className="truncate">{component.item}</div>
+                </TableCell>
+                
+                <TableCell>{component.manufacturer}</TableCell>
+                
+                <TableCell>{component.model}</TableCell>
+                
+                <TableCell>
+                  {component.category && (
+                    <Badge variant="outline" className="text-xs">
+                      {component.category}
+                    </Badge>
                   )}
-                  
-                  {onEdit && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onEdit(component.id)}
-                      title="Edit"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  )}
-                  
-                  {onDelete && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => onDelete(component.id)}
-                      title="Delete"
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                </TableCell>
+                
+                <TableCell>
+                  {component.amperage || '-'}
+                </TableCell>
+                
+                <TableCell>{component.vendor}</TableCell>
+                
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(component.price, component.currency || 'NGN')}
+                </TableCell>
+                
+                {/* Actions column - hidden in selection mode */}
+                {!isSelectionMode && (
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      {selectable && onSelect && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onSelect(component)}
+                          title="Select Component"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      )}
+                      
+                      {onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onEdit(component.id)}
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      
+                      {onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onDelete(component.id)}
+                          title="Delete"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
+      
+      {/* Footer with count and selection info */}
+      <div className="border-t px-6 py-3 bg-gray-50">
+        <p className="text-sm text-gray-600">
+          Showing {components.length} component{components.length !== 1 ? 's' : ''}
+          {isSelectionMode && selectedIds.size > 0 && (
+            <span className="ml-2 text-ppl-navy font-medium">
+              • {selectedIds.size} selected
+            </span>
+          )}
+        </p>
+      </div>
     </Card>
   );
 }

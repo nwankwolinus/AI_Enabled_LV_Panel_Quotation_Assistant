@@ -1,5 +1,5 @@
 // ============================================
-// COMPONENTS PAGE - WITH EDIT
+// COMPONENTS PAGE - WITH BULK SELECTION
 // File: src/app/dashboard/components/page.tsx
 // ============================================
 
@@ -14,15 +14,16 @@ import {
   Select, 
   Card,
 } from '@/components';
-import { Plus, Search, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Upload, Download, FileSpreadsheet, Trash2, X } from 'lucide-react';
 import AddComponentModal from '@/components/forms/AddComponentModal';
 import EditComponentModal from '@/components/forms/EditComponentModal';
 import ImportComponentsModal from '@/components/forms/ImportComponentsModal';
-import { useComponents, useDeleteComponent } from '@/hooks/useComponents';
+import { useComponents, useDeleteComponent, useBulkDeleteComponents } from '@/hooks/useComponents';
 import { useUIStore } from '@/store/useUIStore';
 import { getSupabaseClient } from '@/lib/supabase/client';
 
 const supabase = getSupabaseClient();
+
 export default function ComponentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -30,15 +31,100 @@ export default function ComponentsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingComponentId, setEditingComponentId] = useState<string | null>(null);
+  
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   const { showToast } = useUIStore();
   const deleteComponent = useDeleteComponent();
+  const bulkDeleteComponents = useBulkDeleteComponents();
 
   // Fetch components
   const { data: components, isLoading, refetch } = useComponents({
     search: searchQuery,
     category: categoryFilter === 'all' ? undefined : categoryFilter,
   });
+
+  // Selection handlers
+  const handleToggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (!components) return;
+    
+    if (selectedIds.size === components.length) {
+      // Deselect all
+      setSelectedIds(new Set());
+    } else {
+      // Select all
+      setSelectedIds(new Set(components.map(c => c.id)));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+    setIsSelectionMode(false);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) {
+      showToast('No components selected', 'warning');
+      return;
+    }
+
+    // Check if any selected components are in use
+    const selectedIdsArray = Array.from(selectedIds);
+    const usageChecks = await Promise.all(
+      selectedIdsArray.map(async (id) => {
+        const { data } = await supabase
+          .from('quote_items')
+          .select('quote_id, quotes!inner(quote_number)')
+          .or(`incomers.cs.{"component_id":"${id}"},outgoings.cs.{"component_id":"${id}"},accessories.cs.{"component_id":"${id}"}`)
+          .limit(1);
+        
+        return {
+          id,
+          inUse: data && data.length > 0,
+          quoteNumber: data?.[0]?.quotes?.quote_number,
+        };
+      })
+    );
+
+    const componentsInUse = usageChecks.filter(c => c.inUse);
+    
+    if (componentsInUse.length > 0) {
+      const componentsList = componentsInUse
+        .map(c => `- Component used in ${c.quoteNumber}`)
+        .join('\n');
+      
+      const message = `⚠️ ${componentsInUse.length} of ${selectedIds.size} selected component(s) are currently in use:\n\n${componentsList}\n\n❌ Cannot delete components while they're in use.\n\n💡 Remove them from quotations first.`;
+      
+      alert(message);
+      showToast(`${componentsInUse.length} component(s) in use`, 'warning');
+      return;
+    }
+
+    // Confirm deletion
+    const confirmMessage = `Are you sure you want to delete ${selectedIds.size} component(s)?\n\nThis action cannot be undone.`;
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      await bulkDeleteComponents.mutateAsync(selectedIdsArray);
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      refetch();
+    } catch (error) {
+      // Error handled by hook
+    }
+  };
 
   const handleExportToExcel = () => {
     if (!components || components.length === 0) {
@@ -141,28 +227,93 @@ export default function ComponentsPage() {
             <h1 className="text-3xl font-bold text-gray-900">Components</h1>
             <p className="text-gray-600 mt-1">Manage your component library</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleDownloadTemplate}>
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Template
-            </Button>
-            <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </Button>
-            <Button variant="outline" onClick={handleExportToExcel}>
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
-            <Button className="bg-ppl-navy" onClick={() => setIsAddModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Component
-            </Button>
+          
+          {/* Action Buttons */}
+          <div className="flex gap-2 flex-wrap">
+            {!isSelectionMode ? (
+              <>
+                <Button variant="outline" onClick={handleDownloadTemplate}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Template
+                </Button>
+                <Button variant="outline" onClick={() => setIsImportModalOpen(true)}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import
+                </Button>
+                <Button variant="outline" onClick={handleExportToExcel}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsSelectionMode(true)}
+                  disabled={!components || components.length === 0}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Bulk Delete
+                </Button>
+                <Button className="bg-ppl-navy" onClick={() => setIsAddModalOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Component
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleClearSelection}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleSelectAll}
+                >
+                  {selectedIds.size === components?.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                <Button 
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0 || bulkDeleteComponents.isPending}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {bulkDeleteComponents.isPending 
+                    ? 'Deleting...' 
+                    : `Delete ${selectedIds.size} Selected`
+                  }
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
+        {/* Selection Mode Banner */}
+        {isSelectionMode && (
+          <Card className="p-4 bg-blue-50 border-blue-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 p-2 rounded-lg">
+                  <Trash2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-blue-900">
+                    Bulk Delete Mode
+                  </h3>
+                  <p className="text-sm text-blue-700">
+                    {selectedIds.size === 0 
+                      ? 'Select components to delete' 
+                      : `${selectedIds.size} component(s) selected`
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatCard label="Total Components" value={components?.length || 0} />
           <StatCard 
             label="ACBs" 
@@ -222,6 +373,10 @@ export default function ComponentsPage() {
           isLoading={isLoading}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          // Bulk selection props
+          isSelectionMode={isSelectionMode}
+          selectedIds={selectedIds}
+          onToggleSelection={handleToggleSelection}
         />
       </div>
 
@@ -268,4 +423,4 @@ function StatCard({ label, value }: { label: string; value: number }) {
       <p className="text-2xl font-bold text-ppl-navy">{value}</p>
     </Card>
   );
-} 
+}

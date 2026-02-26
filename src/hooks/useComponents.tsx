@@ -286,6 +286,35 @@ export function useDeleteComponent() {
 }
 
 /**
+ * Bulk delete multiple components
+ */
+export function useBulkDeleteComponents() {
+  const queryClient = useQueryClient();
+  const { showToast } = useUIStore();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Delete all components at once
+      const { error } = await supabase
+        .from('components')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['components'] });
+      showToast(`Successfully deleted ${count} component${count !== 1 ? 's' : ''}`, 'success');
+    },
+    onError: (error) => {
+      console.error('Error bulk deleting components:', error);
+      showToast('Failed to delete components', 'error');
+    },
+  });
+}
+
+/**
  * Import multiple components
  */
 export function useImportComponents() {
