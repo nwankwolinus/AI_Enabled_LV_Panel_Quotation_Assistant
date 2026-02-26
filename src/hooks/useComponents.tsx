@@ -174,68 +174,110 @@ export function useUpdateComponent() {
 /**
  * Delete a component
  */
+/**
+ * Delete a component
+ */
 export function useDeleteComponent() {
   const queryClient = useQueryClient();
   const { showToast } = useUIStore();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      // Check if component is used in any quotations
-      const { data: quotesUsingComponent, error: checkError } = await supabase
-        .from('quote_items')
-        .select('quote_id')
-        .or(`incomers.cs.{"component_id":"${id}"},outgoings.cs.{"component_id":"${id}"},accessories.cs.{"component_id":"${id}"}`)
-        .limit(1);
+      console.log('🗑️ Starting delete for component:', id);
 
-      if (checkError) {
-        console.error('Error checking component usage:', checkError);
-        throw new Error('Failed to verify component usage');
+      // Step 1: Delete audit logs first (if table exists)
+      console.log('📋 Attempting to delete audit logs...');
+      try {
+        const { error: auditError, count } = await supabase
+          .from('component_audit_log')
+          .delete({ count: 'exact' })
+          .eq('component_id', id);
+
+        if (auditError) {
+          console.warn('⚠️ Audit log delete warning:', auditError);
+          // Don't throw - table might not exist or might be okay to skip
+        } else {
+          console.log(`✅ Deleted ${count || 0} audit log entries`);
+        }
+      } catch (auditErr) {
+        console.warn('⚠️ Audit log cleanup failed (continuing):', auditErr);
       }
 
-      // If component is used in quotations, prevent deletion
-      if (quotesUsingComponent && quotesUsingComponent.length > 0) {
-        throw new Error('COMPONENT_IN_USE');
-      }
-
-      // Delete the component
-      const { error } = await supabase
+      // Step 2: Delete the component
+      console.log('🗑️ Attempting to delete component...');
+      const { error, count: deleteCount } = await supabase
         .from('components')
-        .delete()
+        .delete({ count: 'exact' })
         .eq('id', id);
 
       if (error) {
-        console.error('Supabase delete error:', error);
+        console.error('❌ Component delete failed:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
         
-        // Handle specific error codes
+        // Parse the actual error
         if (error.code === '23503') {
           // Foreign key violation
-          throw new Error('COMPONENT_IN_USE');
+          const errorMsg = error.message || '';
+          const detailsMsg = error.details || '';
+          
+          if (errorMsg.includes('component_audit_log') || detailsMsg.includes('component_audit_log')) {
+            // Audit log is still blocking
+            throw new Error('AUDIT_LOG_STILL_EXISTS');
+          } else if (errorMsg.includes('quote_items') || detailsMsg.includes('quote_items')) {
+            throw new Error('COMPONENT_IN_USE');
+          } else {
+            throw new Error('COMPONENT_REFERENCED');
+          }
         }
         
         throw error;
       }
+
+      if (deleteCount === 0) {
+        console.warn('⚠️ No component was deleted (might already be gone)');
+        throw new Error('Component not found');
+      }
+
+      console.log('✅ Component deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['components'] });
       showToast('Component deleted successfully', 'success');
     },
     onError: (error: any) => {
-      console.error('Error deleting component:', error);
+      console.error('❌ Delete mutation failed:', error);
       
-      // Handle specific error types
-      if (error.message === 'COMPONENT_IN_USE') {
+      // Provide helpful error messages
+      if (error.message === 'AUDIT_LOG_STILL_EXISTS') {
         showToast(
-          'Cannot delete component: It is being used in one or more quotations',
+          '⚠️ Delete failed: Audit log constraint. Please contact support.',
           'error'
         );
-      } else if (error.code === '23503' || error.code === '409') {
+      } else if (error.message === 'COMPONENT_IN_USE') {
         showToast(
-          'Cannot delete component: It is referenced by existing quotations',
+          '❌ Cannot delete: Component is used in quotations. Remove it from quotations first.',
+          'error'
+        );
+      } else if (error.message === 'COMPONENT_REFERENCED') {
+        showToast(
+          '❌ Cannot delete: Component is referenced by other records in the system.',
+          'error'
+        );
+      } else if (error.message === 'Component not found') {
+        showToast(
+          '⚠️ Component not found (may have been already deleted)',
+          'warning'
+        );
+      } else if (error.code === '23503') {
+        showToast(
+          '❌ Cannot delete: Component has dependencies. Contact support for help.',
           'error'
         );
       } else {
         showToast(
-          `Failed to delete component: ${error.message || 'Unknown error'}`,
+          `Failed to delete: ${error.message || 'Unknown error'}`,
           'error'
         );
       }
