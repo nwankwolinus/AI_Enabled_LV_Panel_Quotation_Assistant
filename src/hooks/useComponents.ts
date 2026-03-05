@@ -11,6 +11,18 @@ import { useUIStore } from '@/store/useUIStore';
 const supabase = getSupabaseClient();
 
 // ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Normalize filter value to string (handles string or string[])
+ */
+function normalizeFilterValue(value: string | string[] | undefined): string {
+  if (!value) return '';
+  return Array.isArray(value) ? (value[0] || '') : value;
+}
+
+// ============================================
 // QUERY HOOKS
 // ============================================
 
@@ -18,35 +30,54 @@ const supabase = getSupabaseClient();
  * Fetch all components with optional filters
  */
 export function useComponents(filters?: ComponentFilters) {
+  // Create stable query key from filter values (not object reference)
+  const queryKey = [
+    'components',
+    normalizeFilterValue(filters?.search || filters?.search_query),
+    normalizeFilterValue(filters?.category),
+    normalizeFilterValue(filters?.manufacturer),
+  ];
+
   return useQuery({
-    queryKey: ['components', filters],
+    queryKey,
     queryFn: async () => {
       let query = supabase
         .from('components')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Apply search filter
+      // Apply search filter - searches across multiple fields
       if (filters?.search || filters?.search_query) {
-        const searchTerm = filters.search || filters.search_query || '';
-        query = query.or(`item.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,manufacturer.ilike.%${searchTerm}%,vendor.ilike.%${searchTerm}%`);
+        const rawSearch = filters.search || filters.search_query;
+        const searchTerm = normalizeFilterValue(rawSearch).trim();
+        
+        if (searchTerm) {
+          // Search in: item, model, manufacturer, vendor, specification, type, category
+          query = query.or(
+            `item.ilike.%${searchTerm}%,` +
+            `model.ilike.%${searchTerm}%,` +
+            `manufacturer.ilike.%${searchTerm}%,` +
+            `vendor.ilike.%${searchTerm}%,` +
+            `specification.ilike.%${searchTerm}%,` +
+            `type.ilike.%${searchTerm}%,` +
+            `category.ilike.%${searchTerm}%`
+          );
+        }
       }
 
       // Apply category filter
       if (filters?.category) {
-        if (Array.isArray(filters.category)) {
-          query = query.in('category', filters.category);
-        } else {
-          query = query.eq('category', filters.category);
+        const categoryValue = normalizeFilterValue(filters.category);
+        if (categoryValue) {
+          query = query.eq('category', categoryValue);
         }
       }
 
       // Apply manufacturer filter
       if (filters?.manufacturer) {
-        if (Array.isArray(filters.manufacturer)) {
-          query = query.in('manufacturer', filters.manufacturer);
-        } else {
-          query = query.eq('manufacturer', filters.manufacturer);
+        const manufacturerValue = normalizeFilterValue(filters.manufacturer);
+        if (manufacturerValue) {
+          query = query.eq('manufacturer', manufacturerValue);
         }
       }
 
@@ -56,6 +87,8 @@ export function useComponents(filters?: ComponentFilters) {
       return data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnMount: false, // Prevent refetch on component remount
   });
 }
 
@@ -171,9 +204,6 @@ export function useUpdateComponent() {
   });
 }
 
-/**
- * Delete a component
- */
 /**
  * Delete a component
  */
@@ -323,21 +353,38 @@ export function useImportComponents() {
 
   return useMutation({
     mutationFn: async (components: CreateComponentDTO[]) => {
+      console.log('Attempting to import components:', components.length);
+      
       const { data, error } = await supabase
         .from('components')
         .insert(components)
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw new Error(error.message || 'Failed to insert components');
+      }
+      
+      if (!data) {
+        throw new Error('No data returned from insert');
+      }
+      
+      console.log('Successfully inserted components:', data.length);
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['components'] });
       showToast(`Successfully imported ${data.length} components`, 'success');
     },
-    onError: (error) => {
-      console.error('Error importing components:', error);
-      showToast('Failed to import components', 'error');
+    onError: (error: any) => {
+      console.error('Import error:', error);
+      const message = error?.message || 'Failed to import components';
+      showToast(message, 'error');
     },
   });
 }
@@ -355,16 +402,20 @@ export function useExportComponents() {
         .select('*')
         .order('created_at', { ascending: false });
 
+      // Apply search filter
       if (filters?.search || filters?.search_query) {
-        const searchTerm = filters.search || filters.search_query || '';
-        query = query.or(`item.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+        const rawSearch = filters.search || filters.search_query;
+        const searchTerm = normalizeFilterValue(rawSearch);
+        if (searchTerm) {
+          query = query.or(`item.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+        }
       }
 
+      // Apply category filter
       if (filters?.category) {
-        if (Array.isArray(filters.category)) {
-          query = query.in('category', filters.category);
-        } else {
-          query = query.eq('category', filters.category);
+        const categoryValue = normalizeFilterValue(filters.category);
+        if (categoryValue) {
+          query = query.eq('category', categoryValue);
         }
       }
 

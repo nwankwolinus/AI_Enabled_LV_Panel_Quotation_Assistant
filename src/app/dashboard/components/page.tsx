@@ -1,11 +1,11 @@
 // ============================================
-// COMPONENTS PAGE - WITH BULK SELECTION
+// COMPONENTS PAGE - OPTIMIZED WITH DEBOUNCING
 // File: src/app/dashboard/components/page.tsx
 // ============================================
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { 
   DashboardLayout, 
   ComponentsTable, 
@@ -21,11 +21,12 @@ import ImportComponentsModal from '@/components/forms/ImportComponentsModal';
 import { useComponents, useDeleteComponent, useBulkDeleteComponents } from '@/hooks/useComponents';
 import { useUIStore } from '@/store/useUIStore';
 import { getSupabaseClient } from '@/lib/supabase/client';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const supabase = getSupabaseClient();
 
 export default function ComponentsPage() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -40,39 +41,45 @@ export default function ComponentsPage() {
   const deleteComponent = useDeleteComponent();
   const bulkDeleteComponents = useBulkDeleteComponents();
 
-  // Fetch components
-  const { data: components, isLoading, refetch } = useComponents({
-    search: searchQuery,
+  // Debounce search input to prevent excessive queries
+  const debouncedSearch = useDebounce(searchInput, 500); // 500ms delay
+
+  // Memoize filters to prevent object recreation on every render
+  const filters = useMemo(() => ({
+    search: debouncedSearch,
     category: categoryFilter === 'all' ? undefined : categoryFilter,
-  });
+  }), [debouncedSearch, categoryFilter]);
+
+  // Fetch components with stable filters
+  const { data: components, isLoading, refetch } = useComponents(filters);
 
   // Selection handlers
-  const handleToggleSelection = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
+  const handleToggleSelection = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(id)) {
+        newSelected.delete(id);
+      } else {
+        newSelected.add(id);
+      }
+      return newSelected;
+    });
+  }, []);
 
-  const handleSelectAll = () => {
+  const handleSelectAll = useCallback(() => {
     if (!components) return;
     
     if (selectedIds.size === components.length) {
-      // Deselect all
       setSelectedIds(new Set());
     } else {
-      // Select all
       setSelectedIds(new Set(components.map(c => c.id)));
     }
-  };
+  }, [components, selectedIds.size]);
 
-  const handleClearSelection = () => {
+  const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());
     setIsSelectionMode(false);
-  };
+  }, []);
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) {
@@ -335,35 +342,93 @@ export default function ComponentsPage() {
 
         {/* Filters */}
         <Card className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                placeholder="Search by item, model, manufacturer, or vendor..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+          <div className="flex flex-col gap-4">
+            {/* Search and Category Row */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    placeholder="Search components..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="pl-10 pr-10"
+                  />
+                  {searchInput && (
+                    <button
+                      onClick={() => setSearchInput('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="Clear search"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1.5 ml-1">
+                  Search by: Item, Model, Manufacturer, Vendor, Type, Category, or Specification
+                </p>
+              </div>
+              
+              <Select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full md:w-48"
+              >
+                <option value="all">All Categories</option>
+                <option value="ACB">ACB</option>
+                <option value="MCCB">MCCB</option>
+                <option value="MCB">MCB</option>
+                <option value="RCCB">RCCB</option>
+                <option value="Contactor">Contactor</option>
+                <option value="Digital Meter">Digital Meter</option>
+                <option value="Capacitor Bank">Capacitor Bank</option>
+                <option value="COMAP">COMAP</option>
+                <option value="Busbar">Busbar</option>
+                <option value="Cable">Cable</option>
+                <option value="Panel Enclosure">Panel Enclosure</option>
+                <option value="Accessories">Accessories</option>
+              </Select>
             </div>
-            <Select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full md:w-48"
-            >
-              <option value="all">All Categories</option>
-              <option value="ACB">ACB</option>
-              <option value="MCCB">MCCB</option>
-              <option value="MCB">MCB</option>
-              <option value="RCCB">RCCB</option>
-              <option value="Contactor">Contactor</option>
-              <option value="Digital Meter">Digital Meter</option>
-              <option value="Capacitor Bank">Capacitor Bank</option>
-              <option value="COMAP">COMAP</option>
-              <option value="Busbar">Busbar</option>
-              <option value="Cable">Cable</option>
-              <option value="Panel Enclosure">Panel Enclosure</option>
-              <option value="Accessories">Accessories</option>
-            </Select>
+
+            {/* Active Filters Display */}
+            {(debouncedSearch || categoryFilter !== 'all') && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-600">Active filters:</span>
+                {debouncedSearch && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-md">
+                    Search: "{debouncedSearch}"
+                    <button
+                      onClick={() => setSearchInput('')}
+                      className="hover:bg-blue-200 rounded"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {categoryFilter !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-md">
+                    Category: {categoryFilter}
+                    <button
+                      onClick={() => setCategoryFilter('all')}
+                      className="hover:bg-blue-200 rounded"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {(debouncedSearch || categoryFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSearchInput('');
+                      setCategoryFilter('all');
+                    }}
+                    className="text-xs text-gray-600 hover:text-gray-800 underline"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </Card>
 

@@ -5,49 +5,61 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getSupabaseClient } from '@/lib/supabase/client';
+import { Client, CreateClientDTO, UpdateClientDTO, ClientFilters } from '@/types/client.types';
 import { useUIStore } from '@/store/useUIStore';
 
 const supabase = getSupabaseClient();
 
-export interface Client {
-  id: string;
-  name: string;
-  address?: string;
-  contact_person?: string;
-  email?: string;
-  phone?: string;
-  created_at: string;
-  updated_at: string;
-}
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
-export interface CreateClientDTO {
-  name: string;
-  address?: string;
-  contact_person?: string;
-  email?: string;
-  phone?: string;
+function normalizeFilterValue(value: string | string[] | undefined): string {
+  if (!value) return '';
+  return Array.isArray(value) ? (value[0] || '') : value;
 }
 
 // ============================================
 // QUERY HOOKS
 // ============================================
 
-export function useClients() {
+/**
+ * Fetch all clients with optional filters
+ */
+export function useClients(filters?: ClientFilters) {
+  const searchTerm = filters?.search_query ? normalizeFilterValue(filters.search_query) : '';
+  
   return useQuery({
-    queryKey: ['clients'],
+    queryKey: ['clients', searchTerm],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('clients')
         .select('*')
-        .order('name', { ascending: true });
+        .order('created_at', { ascending: false });
+
+      if (searchTerm) {
+        query = query.or(
+          `name.ilike.%${searchTerm}%,` +
+          `contact_person.ilike.%${searchTerm}%,` +
+          `email.ilike.%${searchTerm}%,` +
+          `phone.ilike.%${searchTerm}%,` +
+          `address.ilike.%${searchTerm}%`
+        );
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return data as Client[];
     },
     staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 }
 
+/**
+ * Fetch a single client by ID
+ */
 export function useClient(id: string) {
   return useQuery({
     queryKey: ['clients', id],
@@ -69,6 +81,9 @@ export function useClient(id: string) {
 // MUTATION HOOKS
 // ============================================
 
+/**
+ * Create a new client
+ */
 export function useCreateClient() {
   const queryClient = useQueryClient();
   const { showToast } = useUIStore();
@@ -82,7 +97,7 @@ export function useCreateClient() {
         .single();
 
       if (error) throw error;
-      return client;
+      return client as Client;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -95,12 +110,15 @@ export function useCreateClient() {
   });
 }
 
+/**
+ * Update an existing client
+ */
 export function useUpdateClient() {
   const queryClient = useQueryClient();
   const { showToast } = useUIStore();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateClientDTO> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: UpdateClientDTO }) => {
       const { data: client, error } = await supabase
         .from('clients')
         .update(data)
@@ -109,7 +127,7 @@ export function useUpdateClient() {
         .single();
 
       if (error) throw error;
-      return client;
+      return client as Client;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -122,6 +140,9 @@ export function useUpdateClient() {
   });
 }
 
+/**
+ * Delete a client
+ */
 export function useDeleteClient() {
   const queryClient = useQueryClient();
   const { showToast } = useUIStore();
