@@ -234,6 +234,8 @@ export interface UpdateQuoteDTO {
   total?: number;
   vat?: number;
   grand_total?: number;
+  sent_at?: string;
+  approved_at?: string;
 }
 
 /**

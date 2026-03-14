@@ -1,7 +1,7 @@
-import { useEffect } from 'use';
+import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getSupabaseClient } from '@/src/lib/supabase/client';
-import { Quotation } from '@/types/quotation.types';
+import { getSupabaseClient } from '@/lib/supabase/client';
+import { Quote } from '@/types/quotation.types';
 
 export const useRealtimeQuotations = () => {
   const queryClient = useQueryClient();
@@ -26,7 +26,7 @@ export const useRealtimeQuotations = () => {
           } else if (payload.eventType === 'UPDATE') {
             console.log('Updated quotation:', payload.new);
             queryClient.invalidateQueries({
-              queryKey: ['quotation', (payload.new as Quotation).id],
+              queryKey: ['quotation', (payload.new as Quote).id],
             });
           } else if (payload.eventType === 'DELETE') {
             console.log('Deleted quotation:', payload.old);

@@ -1,19 +1,21 @@
 // ============================================
-// CREATE QUOTATION PAGE - REAL DATABASE
+// CREATE QUOTATION PAGE - WITH AUTO QUOTE NUMBER
 // File: src/app/dashboard/quotations/create/page.tsx
+// FIXED: Added auto quote number generation
 // ============================================
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout, Button, Input, Label, Select, Textarea, Card } from '@/components';
-import { Save, Plus, Trash2, Search } from 'lucide-react';
+import { Save, Plus, Trash2, Search, RefreshCw } from 'lucide-react';
 import { useComponents } from '@/hooks/useComponents';
 import { useClients } from '@/hooks/useClients';
 import { useCreateQuotation } from '@/hooks/useQuotations';
 import { useUIStore } from '@/store/useUIStore';
 import ComponentSearchModal from '@/components/forms/ComponentSearchModal';
+import { generateUniqueQuoteNumber } from '@/lib/utils';
 
 interface QuoteItem {
   id: string;
@@ -63,11 +65,47 @@ export default function CreateQuotationPage() {
     },
   ]);
 
+  // ✅ FIXED: Added quote number state and generation
+  const [quoteNumber, setQuoteNumber] = useState('');
+  const [isGeneratingQuoteNumber, setIsGeneratingQuoteNumber] = useState(false);
+
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchingFor, setSearchingFor] = useState<{
     itemIndex: number;
     type: 'incomer' | 'outgoing' | 'accessory';
   } | null>(null);
+
+  // ✅ FIXED: Generate quote number on mount
+  useEffect(() => {
+    const generateNumber = async () => {
+      setIsGeneratingQuoteNumber(true);
+      try {
+        const number = await generateUniqueQuoteNumber();
+        setQuoteNumber(number);
+      } catch (error) {
+        console.error('Error generating quote number:', error);
+        showToast('Failed to generate quote number', 'error');
+      } finally {
+        setIsGeneratingQuoteNumber(false);
+      }
+    };
+
+    generateNumber();
+  }, [showToast]);
+
+  // ✅ FIXED: Regenerate quote number handler
+  const handleRegenerateQuoteNumber = async () => {
+    setIsGeneratingQuoteNumber(true);
+    try {
+      const number = await generateUniqueQuoteNumber();
+      setQuoteNumber(number);
+      showToast('New quote number generated', 'success');
+    } catch (error) {
+      showToast('Failed to generate quote number', 'error');
+    } finally {
+      setIsGeneratingQuoteNumber(false);
+    }
+  };
 
   // Calculate totals
   const calculateItemSubtotal = (item: QuoteItem) => {
@@ -181,6 +219,12 @@ export default function CreateQuotationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // ✅ FIXED: Validate quote number
+    if (!quoteNumber) {
+      showToast('Quote number is required', 'error');
+      return;
+    }
+
     if (!formData.client_id) {
       showToast('Please select a client', 'error');
       return;
@@ -193,6 +237,7 @@ export default function CreateQuotationPage() {
 
     try {
       const quotationData = {
+        quote_number: quoteNumber, // ✅ FIXED: Use generated quote number
         ...formData,
         total: grandTotal,
         vat,
@@ -214,14 +259,21 @@ export default function CreateQuotationPage() {
       await createQuotation.mutateAsync(quotationData);
       showToast('Quotation created successfully', 'success');
       router.push('/dashboard/quotations');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating quotation:', error);
-      showToast('Failed to create quotation', 'error');
+      
+      // ✅ FIXED: Handle duplicate quote number error
+      if (error?.code === '23505') {
+        showToast('Quote number conflict. Generating new number...', 'warning');
+        await handleRegenerateQuoteNumber();
+      } else {
+        showToast('Failed to create quotation', 'error');
+      }
     }
   };
 
   return (
-    <DashboardLayout user={null} onLogout={() => {}}>
+    <DashboardLayout>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -233,13 +285,52 @@ export default function CreateQuotationPage() {
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-ppl-navy" disabled={createQuotation.isPending}>
+            <Button 
+              type="submit" 
+              className="bg-ppl-navy" 
+              disabled={createQuotation.isPending || isGeneratingQuoteNumber || !quoteNumber}
+            >
               <Save className="w-4 h-4 mr-2" />
               {createQuotation.isPending ? 'Saving...' : 'Save Quotation'}
             </Button>
           </div>
         </div>
 
+        {/* ✅ FIXED: Quote Number Section */}
+        <Card className="p-6 bg-blue-50 border-blue-200">
+          <h2 className="text-xl font-semibold mb-4 text-blue-900">Quote Number</h2>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                value={quoteNumber}
+                onChange={(e) => setQuoteNumber(e.target.value)}
+                placeholder="PPL/2024/001"
+                disabled={isGeneratingQuoteNumber}
+                required
+                className="font-mono text-lg bg-white"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleRegenerateQuoteNumber}
+              disabled={isGeneratingQuoteNumber}
+              title="Generate new quote number"
+            >
+              <RefreshCw className={`w-4 h-4 ${isGeneratingQuoteNumber ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+          <p className="text-sm text-blue-700 mt-2 font-medium">
+            {isGeneratingQuoteNumber 
+              ? '⏳ Generating unique quote number...' 
+              : quoteNumber 
+                ? '✅ Quote number ready - Sequential from database' 
+                : '⚠️ Click regenerate to get a quote number'
+            }
+          </p>
+        </Card>
+
+        {/* Rest of your form continues here... */}
         {/* Client Information */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Client Information</h2>

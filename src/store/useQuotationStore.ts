@@ -1,19 +1,19 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { Quotation, QuotationItem } from '@/types/quotation.types';
+import { Quote, QuoteItem } from '@/types/quotation.types';
 
 interface QuotationState {
   // State
-  currentQuotation: Quotation | null;
-  quotationItems: QuotationItem[];
+  currentQuotation: Quote | null;
+  quotationItems: QuoteItem[];
   isEditing: boolean;
   isDirty: boolean;
 
   // Actions
-  setCurrentQuotation: (quotation: Quotation | null) => void;
-  setQuotationItems: (items: QuotationItem[]) => void;
-  addItem: (item: QuotationItem) => void;
-  updateItem: (id: string, updates: Partial<QuotationItem>) => void;
+  setCurrentQuotation: (quotation: Quote | null) => void;
+  setQuotationItems: (items: QuoteItem[]) => void;
+  addItem: (item: QuoteItem) => void;
+  updateItem: (id: string, updates: Partial<QuoteItem>) => void;
   removeItem: (id: string) => void;
   setEditing: (editing: boolean) => void;
   setDirty: (dirty: boolean) => void;
@@ -85,7 +85,7 @@ export const useQuotationStore = create<QuotationState>()(
 
         getTotalPrice: () => {
           const { quotationItems } = get();
-          return quotationItems.reduce((sum, item) => sum + item.total_price, 0);
+          return quotationItems.reduce((sum, item) => sum + (item.subtotal ?? 0), 0);
         },
 
         getItemCount: () => {
