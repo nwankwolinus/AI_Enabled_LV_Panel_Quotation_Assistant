@@ -1,13 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // ============================================
-// PROFESSIONAL QUOTATION PDF PAGE
+// PROFESSIONAL QUOTATION PDF PAGE - FIXED
 // File: src/app/dashboard/quotations/[id]/download/page.tsx
-// Matches Power Projects Ltd format
+// No setState in useEffect - Performance optimized
 // ============================================
 
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { useQuotation } from '@/hooks/useQuotations';
 import { useQuoteItems } from '@/hooks/useQuoteItems';
 
@@ -17,14 +17,23 @@ export default function QuotationPDFPage() {
   
   const { data: quote, isLoading: quoteLoading } = useQuotation(quoteId);
   const { data: items = [], isLoading: itemsLoading } = useQuoteItems(quoteId);
-  
-  const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  // Helper function to parse JSON fields
+  const parseJsonField = (field: any): any[] => {
+    if (!field) return [];
+    if (Array.isArray(field)) return field;
+    if (typeof field === 'string') {
+      try {
+        return JSON.parse(field);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
 
-  if (!isClient || quoteLoading || itemsLoading) {
+  // Loading state
+  if (quoteLoading || itemsLoading) {
     return (
       <div style={{ 
         display: 'flex', 
@@ -40,204 +49,196 @@ export default function QuotationPDFPage() {
     );
   }
 
+  // Not found state
   if (!quote) {
     return (
       <div style={{ padding: '40px', fontFamily: 'Times New Roman, serif' }}>
         <h2>Quote Not Found</h2>
+        <p>The quotation you&#39;re looking for doesn&#39;t exist.</p>
       </div>
     );
   }
 
+  const createdAt = quote.created_at 
+  ? new Date(quote.created_at) 
+  : new Date(); // still runs once per render, but not inside JSX expression
+
   return (
-    <html>
-      <head>
-        <meta charSet="utf-8" />
-        <title>Quotation {quote.quote_number}</title>
-        <style dangerouslySetInnerHTML={{ __html: `
-          @page {
-            size: A4;
-            margin: 1.5cm 2cm;
-          }
-          
-          @media print {
-            body { margin: 0; padding: 0; }
-            .no-print { display: none !important; }
-          }
-          
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          body {
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 11pt;
-            line-height: 1.4;
-            color: #000;
-            background: white;
-            padding: 20px;
-            max-width: 210mm;
-            margin: 0 auto;
-          }
-          
-          .letterhead {
-            text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #000;
-          }
-          
-          .company-name {
-            color: #C00;
-            font-size: 18pt;
-            font-weight: bold;
-            margin-bottom: 5px;
-          }
-          
-          .company-info {
-            font-size: 10pt;
-            line-height: 1.3;
-          }
-          
-          .quote-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            font-size: 10pt;
-          }
-          
-          .recipient {
-            margin-bottom: 20px;
-          }
-          
-          .recipient p {
-            margin: 2px 0;
-          }
-          
-          .subject {
-            text-align: center;
-            font-weight: bold;
-            text-decoration: underline;
-            margin: 20px 0;
-            font-size: 11pt;
-          }
-          
-          .intro {
-            text-align: justify;
-            margin-bottom: 20px;
-          }
-          
-          .item-section {
-            margin-bottom: 25px;
-            page-break-inside: avoid;
-          }
-          
-          .item-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-            text-decoration: underline;
-          }
-          
-          .item-details {
-            margin-left: 0;
-          }
-          
-          .item-row {
-            display: flex;
-            margin-bottom: 3px;
-          }
-          
-          .item-label {
-            font-weight: bold;
-            min-width: 140px;
-            flex-shrink: 0;
-          }
-          
-          .item-value {
-            flex: 1;
-          }
-          
-          .component-list {
-            margin-left: 140px;
-            margin-top: -3px;
-          }
-          
-          .component-item {
-            margin-bottom: 2px;
-          }
-          
-          .pricing {
-            margin-top: 15px;
-          }
-          
-          .price-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 3px;
-          }
-          
-          .total-section {
-            margin: 25px 0;
-            padding: 10px 0;
-            border-top: 2px solid #000;
-            border-bottom: 2px solid #000;
-          }
-          
-          .grand-total {
-            font-weight: bold;
-            font-size: 12pt;
-          }
-          
-          .terms {
-            margin-top: 25px;
-            page-break-inside: avoid;
-          }
-          
-          .terms-row {
-            display: flex;
-            margin-bottom: 5px;
-          }
-          
-          .terms-label {
-            font-weight: bold;
-            min-width: 150px;
-          }
-          
-          .closing {
-            margin-top: 30px;
-          }
-          
-          .signature-block {
-            margin-top: 30px;
-          }
-          
-          .signature-block p {
-            margin: 3px 0;
-          }
-          
-          .print-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #C00;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            z-index: 1000;
-          }
-          
-          .print-button:hover {
-            background: #A00;
-          }
-        ` }} />
-      </head>
-      <body>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @page {
+          size: A4;
+          margin: 1.5cm 2cm;
+        }
+        
+        @media print {
+          body { margin: 0; padding: 0; }
+          .no-print { display: none !important; }
+        }
+        
+        .pdf-container {
+          font-family: 'Times New Roman', Times, serif;
+          font-size: 11pt;
+          line-height: 1.4;
+          color: #000;
+          background: white;
+          padding: 20px;
+          max-width: 210mm;
+          margin: 0 auto;
+        }
+        
+        .letterhead {
+          text-align: center;
+          margin-bottom: 20px;
+          padding-bottom: 10px;
+          border-bottom: 2px solid #000;
+        }
+        
+        .company-name {
+          color: #C00;
+          font-size: 18pt;
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+        
+        .company-info {
+          font-size: 10pt;
+          line-height: 1.3;
+        }
+        
+        .quote-header {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 20px;
+          font-size: 10pt;
+        }
+        
+        .recipient {
+          margin-bottom: 20px;
+        }
+        
+        .recipient p {
+          margin: 2px 0;
+        }
+        
+        .subject {
+          text-align: center;
+          font-weight: bold;
+          text-decoration: underline;
+          margin: 20px 0;
+          font-size: 11pt;
+        }
+        
+        .intro {
+          text-align: justify;
+          margin-bottom: 20px;
+        }
+        
+        .item-section {
+          margin-bottom: 25px;
+          page-break-inside: avoid;
+        }
+        
+        .item-title {
+          font-weight: bold;
+          margin-bottom: 10px;
+          text-decoration: underline;
+        }
+        
+        .item-details {
+          margin-left: 0;
+        }
+        
+        .item-row {
+          display: flex;
+          margin-bottom: 3px;
+        }
+        
+        .item-label {
+          font-weight: bold;
+          min-width: 140px;
+          flex-shrink: 0;
+        }
+        
+        .item-value {
+          flex: 1;
+        }
+        
+        .component-item {
+          margin-bottom: 2px;
+        }
+        
+        .pricing {
+          margin-top: 15px;
+        }
+        
+        .price-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 3px;
+        }
+        
+        .total-section {
+          margin: 25px 0;
+          padding: 10px 0;
+          border-top: 2px solid #000;
+          border-bottom: 2px solid #000;
+        }
+        
+        .grand-total {
+          font-weight: bold;
+          font-size: 12pt;
+        }
+        
+        .terms {
+          margin-top: 25px;
+          page-break-inside: avoid;
+        }
+        
+        .terms-row {
+          display: flex;
+          margin-bottom: 5px;
+        }
+        
+        .terms-label {
+          font-weight: bold;
+          min-width: 150px;
+        }
+        
+        .closing {
+          margin-top: 30px;
+        }
+        
+        .signature-block {
+          margin-top: 30px;
+        }
+        
+        .signature-block p {
+          margin: 3px 0;
+        }
+        
+        .print-button {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          background: #C00;
+          color: white;
+          border: none;
+          padding: 12px 24px;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: bold;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          z-index: 1000;
+        }
+        
+        .print-button:hover {
+          background: #A00;
+        }
+      ` }} />
+
+      <div className="pdf-container">
         {/* Letterhead */}
         <div className="letterhead">
           <div className="company-name">POWER PROJECTS LIMITED</div>
@@ -250,11 +251,15 @@ export default function QuotationPDFPage() {
         {/* Quote Number and Date */}
         <div className="quote-header">
           <div>{quote.quote_number}</div>
-          <div>{new Date(quote.created_at || Date.now()).toLocaleDateString('en-GB', { 
-            day: 'numeric', 
-            month: 'short', 
-            year: 'numeric' 
-          })}</div>
+          <div>
+            {createdAt
+              ? createdAt.toLocaleDateString('en-GB', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
+              : '' }
+          </div>
         </div>
 
         {/* Recipient */}
@@ -281,20 +286,6 @@ export default function QuotationPDFPage() {
 
         {/* Items */}
         {items.map((item, index) => {
-          // Parse component details from JSON fields - handle both JSON and already-parsed data
-          const parseJsonField = (field: any): any[] => {
-            if (!field) return [];
-            if (Array.isArray(field)) return field;
-            if (typeof field === 'string') {
-              try {
-                return JSON.parse(field);
-              } catch {
-                return [];
-              }
-            }
-            return [];
-          };
-          
           const incomers = parseJsonField(item.incomers);
           const outgoings = parseJsonField(item.outgoings);
           const accessories = parseJsonField(item.accessories);
@@ -437,7 +428,7 @@ export default function QuotationPDFPage() {
         <button className="print-button no-print" onClick={() => window.print()}>
           🖨️ Print / Save as PDF
         </button>
-      </body>
-    </html>
+      </div>
+    </>
   );
 }
