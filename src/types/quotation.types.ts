@@ -36,7 +36,16 @@ export interface Quote extends QuoteRow {
  * Maps to database 'quote_items' table
  * Note: This is a complex structure with many specific fields for LV Panel components
  */
-export interface QuoteItem extends QuoteItemRow {}
+export type PanelType = 
+  | 'isolator'
+  | 'changeover'
+  | 'lv_panel'
+  | 'synch_panel'
+  | 'custom';
+
+export interface QuoteItem extends QuoteItemRow {
+  panel_type: PanelType | null; // ✅ FIXED
+}
 
 /**
  * Quote with all related data
@@ -184,6 +193,8 @@ export interface CreateQuoteDTO {
 export interface CreateQuoteItemDTO {
   item_number: number;
   panel_name: string;
+
+  panel_type?: PanelType;
   
   // Busbar details
   busbar_type?: string;

@@ -28,7 +28,57 @@ export function useQuoteItems(quoteId: string) {
         .order('item_number', { ascending: true });
 
       if (error) throw error;
-      return data as QuoteItemRow[];
+
+      // STEP 1: Collect all components IDs
+      const allComponentIds = new Set<string>();
+      
+      data.forEach(item => {
+        const incomers = Array.isArray(item.incomers) ? item.incomers : [];
+        const outgoings = Array.isArray(item.outgoings) ? item.outgoings : [];
+        const accessories = Array.isArray(item.accessories) ? item.accessories : [];
+
+        [...incomers, ...outgoings, ...accessories].forEach((c: any) => {
+          if (c.component_id) {
+            allComponentIds.add(c.component_id);
+          }
+        });
+      });
+
+      const componentIds = Array.from(allComponentIds);
+
+      // STEP 2: Fetch all components
+      let componentMap: Record<string, any> = {};
+
+      if (componentIds.length > 0) {
+        const { data: components, error: compError } = await supabase
+          .from('components')
+          .select('*')
+          .in('id', componentIds);
+
+        if (compError) throw compError;
+
+        componentMap = Object.fromEntries(
+          components.map(c => [c.id, c])
+        );
+      }
+
+      // STEP 3: Inject component
+      const enrichedItems = data.map(item => {
+        const enrich = (arr: any[]) =>
+          (arr || []).map(c => ({
+             ...c,
+             details: componentMap[c.component_id] || null,
+          }))
+      
+          return {
+            ...item,
+            incomers: enrich(Array.isArray(item.incomers) ? item.incomers : []),
+            outgoings: enrich(Array.isArray(item.outgoings) ? item.outgoings : []),
+            accessories: enrich(Array.isArray(item.accessories) ? item.accessories : []),
+          }
+      })
+          
+      return enrichedItems as QuoteItemRow[];
     },
     enabled: !!quoteId,
     staleTime: 1000 * 60 * 5, // 5 minutes

@@ -17,10 +17,12 @@ import { useUIStore } from '@/store/useUIStore';
 import ComponentSearchModal from '@/components/forms/ComponentSearchModal';
 import { generateUniqueQuoteNumber } from '@/lib/utils';
 
+type PanelType = 'isolator' | 'changeover' | 'synch_panel' | 'lv_panel' | 'custom';
 interface QuoteItem {
   id: string;
+  panel_type: PanelType | null;
   panel_name: string;
-  busbar_amperage: string;
+  busbar_amperage?: string;
   incomers: Array<{ component_id: string; quantity: number; price: number }>;
   outgoings: Array<{ component_id: string; quantity: number; price: number }>;
   accessories: Array<{ component_id: string; quantity: number; price: number }>;
@@ -54,6 +56,7 @@ export default function CreateQuotationPage() {
   const [items, setItems] = useState<QuoteItem[]>([
     {
       id: crypto.randomUUID(),
+      panel_type: 'lv_panel', // default
       panel_name: '',
       busbar_amperage: '',
       incomers: [],
@@ -137,6 +140,7 @@ export default function CreateQuotationPage() {
       ...items,
       {
         id: crypto.randomUUID(),
+        panel_type: null,
         panel_name: '',
         busbar_amperage: '',
         incomers: [],
@@ -330,7 +334,7 @@ export default function CreateQuotationPage() {
           </p>
         </Card>
 
-        {/* Rest of your form continues here... */}
+       
         {/* Client Information */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Client Information</h2>
@@ -407,6 +411,21 @@ export default function CreateQuotationPage() {
                 {/* Panel Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
+                    <Label>Panel Type *</Label>
+                    <Select
+                      required
+                      value={item.panel_type || ''}
+                      onChange={(e) => updateItem(itemIndex, 'panel_type', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="isolator">Isolator</option>
+                      <option value="changeover">Changeover</option>
+                      <option value="lv_panel">LV Panel</option>
+                      <option value="synch_panel">Synch Panel</option>
+                      <option value="custom">Custom</option>
+                    </Select>
+                  </div>
+                  <div>
                     <Label>Panel Name *</Label>
                     <Input
                       required
@@ -437,33 +456,66 @@ export default function CreateQuotationPage() {
                 </div>
 
                 {/* Components Sections */}
-                <ComponentSection
-                  title="Incomers"
-                  components={item.incomers}
-                  allComponents={components || []}
-                  onAdd={() => openComponentSearch(itemIndex, 'incomer')}
-                  onRemove={(idx) => removeComponent(itemIndex, 'incomer', idx)}
-                  onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'incomer', idx, qty)}
-                />
-
-                <ComponentSection
-                  title="Outgoings"
-                  components={item.outgoings}
-                  allComponents={components || []}
-                  onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
-                  onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
-                  onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
-                />
-
-                <ComponentSection
-                  title="Accessories"
-                  components={item.accessories}
-                  allComponents={components || []}
-                  onAdd={() => openComponentSearch(itemIndex, 'accessory')}
-                  onRemove={(idx) => removeComponent(itemIndex, 'accessory', idx)}
-                  onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'accessory', idx, qty)}
-                />
-
+                {item.panel_type !== 'isolator' && (
+                  <ComponentSection
+                    title="Incomers"
+                    components={item.incomers}
+                    allComponents={components || []}
+                    onAdd={() => openComponentSearch(itemIndex, 'incomer')}
+                    onRemove={(idx) => removeComponent(itemIndex, 'incomer', idx)}
+                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'incomer', idx, qty)}
+                  />
+                )}
+                {item.panel_type === 'lv_panel' && (
+                  <ComponentSection
+                    title="Outgoings"
+                    components={item.outgoings}
+                    allComponents={components || []}
+                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
+                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
+                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
+                  />
+                )}
+                {item.panel_type === 'changeover' && (
+                  <ComponentSection
+                    title="Outgoings"
+                    components={item.outgoings}
+                    allComponents={components || []}
+                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
+                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
+                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
+                  />
+                )}
+                {item.panel_type === 'synch_panel' && (
+                  <ComponentSection
+                    title="Outgoings"
+                    components={item.outgoings}
+                    allComponents={components || []}
+                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
+                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
+                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
+                  />
+                )}
+                {item.panel_type === 'custom' && (
+                  <ComponentSection
+                    title="Outgoings"
+                    components={item.outgoings}
+                    allComponents={components || []}
+                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
+                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
+                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
+                  />
+                )}
+                {item.panel_type && (
+                  <ComponentSection
+                    title="Accessories"
+                    components={item.accessories}
+                    allComponents={components || []}
+                    onAdd={() => openComponentSearch(itemIndex, 'accessory')}
+                    onRemove={(idx) => removeComponent(itemIndex, 'accessory', idx)}
+                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'accessory', idx, qty)}
+                  />
+                )}
                 {/* Enclosure */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                   <div>

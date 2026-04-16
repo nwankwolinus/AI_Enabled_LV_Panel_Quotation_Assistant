@@ -1,9 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// ============================================
-// PROFESSIONAL QUOTATION PDF PAGE - FIXED
-// File: src/app/dashboard/quotations/[id]/download/page.tsx
-// No setState in useEffect - Performance optimized
-// ============================================
 
 'use client';
 
@@ -14,11 +9,10 @@ import { useQuoteItems } from '@/hooks/useQuoteItems';
 export default function QuotationPDFPage() {
   const params = useParams();
   const quoteId = params.id as string;
-  
+
   const { data: quote, isLoading: quoteLoading } = useQuotation(quoteId);
   const { data: items = [], isLoading: itemsLoading } = useQuoteItems(quoteId);
-
-  // Helper function to parse JSON fields
+  
   const parseJsonField = (field: any): any[] => {
     if (!field) return [];
     if (Array.isArray(field)) return field;
@@ -32,40 +26,40 @@ export default function QuotationPDFPage() {
     return [];
   };
 
-  // Loading state
   if (quoteLoading || itemsLoading) {
     return (
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        minHeight: '100vh',
-        fontFamily: 'Times New Roman, serif'
+        minHeight: '100vh' 
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <p>Loading quotation...</p>
-        </div>
+        <p>Loading quotation...</p>
       </div>
     );
   }
 
-  // Not found state
   if (!quote) {
     return (
-      <div style={{ padding: '40px', fontFamily: 'Times New Roman, serif' }}>
+      <div style={{ padding: '40px' }}>
         <h2>Quote Not Found</h2>
-        <p>The quotation you&#39;re looking for doesn&#39;t exist.</p>
       </div>
     );
   }
 
-  const createdAt = quote.created_at 
-  ? new Date(quote.created_at) 
-  : new Date(); // still runs once per render, but not inside JSX expression
+  const createdAt = new Date(quote.created_at || Date.now());
+  const formatComponent = (comp: any) => {
+    const d = comp.details;
+   
+    if (!d) return `${comp.quantity || 1}No.`;
 
+    const qty = comp.quantity || 1;
+
+    return `${qty}No${qty > 1 ? 's' : ''}. ${d.amperage || ''} ${d.poles || ''} ${d.category || ''} ${d.manufacturer || ''}`;
+  };
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style>{`
         @page {
           size: A4;
           margin: 1.5cm 2cm;
@@ -76,15 +70,19 @@ export default function QuotationPDFPage() {
           .no-print { display: none !important; }
         }
         
-        .pdf-container {
+        body {
           font-family: 'Times New Roman', Times, serif;
           font-size: 11pt;
           line-height: 1.4;
           color: #000;
           background: white;
-          padding: 20px;
+        }
+        
+        .pdf-container {
           max-width: 210mm;
           margin: 0 auto;
+          padding: 20px;
+          background: white;
         }
         
         .letterhead {
@@ -145,10 +143,6 @@ export default function QuotationPDFPage() {
           text-decoration: underline;
         }
         
-        .item-details {
-          margin-left: 0;
-        }
-        
         .item-row {
           display: flex;
           margin-bottom: 3px;
@@ -162,6 +156,10 @@ export default function QuotationPDFPage() {
         
         .item-value {
           flex: 1;
+        }
+        
+        .component-list {
+          margin-left: 0;
         }
         
         .component-item {
@@ -236,7 +234,7 @@ export default function QuotationPDFPage() {
         .print-button:hover {
           background: #A00;
         }
-      ` }} />
+      `}</style>
 
       <div className="pdf-container">
         {/* Letterhead */}
@@ -252,13 +250,11 @@ export default function QuotationPDFPage() {
         <div className="quote-header">
           <div>{quote.quote_number}</div>
           <div>
-            {createdAt
-              ? createdAt.toLocaleDateString('en-GB', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })
-              : '' }
+            {createdAt.toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            })}
           </div>
         </div>
 
@@ -268,8 +264,7 @@ export default function QuotationPDFPage() {
           <p>{quote.client_name}</p>
           {quote.client_address && <p>{quote.client_address}</p>}
           <p>&nbsp;</p>
-          {quote.attention && <p>Dear {quote.attention},</p>}
-          {!quote.attention && <p>Dear Sir/Madam,</p>}
+          <p>{quote.attention ? `Dear ${quote.attention},` : 'Dear Sir/Madam,'}</p>
         </div>
 
         {/* Subject */}
@@ -289,80 +284,84 @@ export default function QuotationPDFPage() {
           const incomers = parseJsonField(item.incomers);
           const outgoings = parseJsonField(item.outgoings);
           const accessories = parseJsonField(item.accessories);
-          
+
           return (
             <div key={item.id} className="item-section">
               <div className="item-title">
                 ITEM {index + 1}: {item.panel_name}
               </div>
-              
-              <div className="item-details">
-                {/* Incomer */}
-                {incomers.length > 0 && (
-                  <div className="item-row">
-                    <div className="item-label">Incomer:</div>
-                    <div className="item-value">
+
+              {/* Incomer */}
+              {incomers.length > 0 && (
+                <div className="item-row">
+                  <div className="item-label">Incomer:</div>
+                  <div className="item-value">
+                    <div className="component-list">
                       {incomers.map((inc: any, idx: number) => (
-                        <div key={idx}>
-                          {inc.quantity}No{inc.quantity > 1 ? 's' : ''}. {inc.description || inc.rating} – {inc.make || 'CHINT'}
+                        <div key={idx} className="component-item">
+                          {formatComponent(inc)}
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Busbar */}
-                {item.busbar_amperage && (
-                  <div className="item-row">
-                    <div className="item-label">Busbar:</div>
-                    <div className="item-value">
-                      Set of {item.busbar_amperage} 4pole air insulated copper Busbar with earth terminals
-                    </div>
+              {/* Busbar */}
+              {item.busbar_amperage && (
+                <div className="item-row">
+                  <div className="item-label">Busbar:</div>
+                  <div className="item-value">
+                    Set of {item.busbar_amperage} 4pole air insulated copper Busbar with earth terminals
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Outgoings */}
-                {outgoings.length > 0 && (
-                  <div className="item-row">
-                    <div className="item-label">Outgoing:</div>
-                    <div className="item-value">
+              {/* Outgoings */}
+              {outgoings.length > 0 && (
+                <div className="item-row">
+                  <div className="item-label">Outgoing:</div>
+                  <div className="item-value">
+                    <div className="component-list">
                       {outgoings.map((out: any, idx: number) => (
                         <div key={idx} className="component-item">
-                          {out.quantity}No{out.quantity > 1 ? 's' : ''}. {out.description || out.rating} – {out.make || 'CHINT'}
+                          {formatComponent(out)}
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Control/Instruments */}
-                {accessories.length > 0 && (
-                  <div className="item-row">
-                    <div className="item-label">Control/Instrument:</div>
-                    <div className="item-value">
+              {/* Control/Instruments */}
+              {accessories.length > 0 && (
+                <div className="item-row">
+                  <div className="item-label">Control/Instrument:</div>
+                  <div className="item-value">
+                    <div className="component-list">
                       {accessories.map((acc: any, idx: number) => (
                         <div key={idx} className="component-item">
-                          {acc.quantity}No{acc.quantity > 1 ? 's' : ''}. {acc.description}
+                          {acc.quantity}No{acc.quantity > 1 ? 's' : ''}. {acc.description || acc.item}
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Enclosure */}
-                {item.enclosure_dimensions && (
-                  <div className="item-row">
-                    <div className="item-label">Enclosure size:</div>
-                    <div className="item-value">{item.enclosure_dimensions} (HxWxD)</div>
-                  </div>
-                )}
+              {/* Enclosure */}
+              {item.enclosure_dimensions && (
+                <div className="item-row">
+                  <div className="item-label">Enclosure size:</div>
+                  <div className="item-value">{item.enclosure_dimensions} (HxWxD)</div>
+                </div>
+              )}
 
-                {/* Pricing */}
-                <div className="pricing">
-                  <div className="price-row">
-                    <span style={{ fontWeight: 'bold' }}>Unit Price:</span>
-                    <span>N{(item.subtotal || 0).toLocaleString()}</span>
-                  </div>
+              {/* Pricing */}
+              <div className="pricing">
+                <div className="price-row">
+                  <span style={{ fontWeight: 'bold' }}>Unit Price:</span>
+                  <span>N{(item.subtotal || 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>
