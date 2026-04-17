@@ -54,8 +54,15 @@ export default function QuotationPDFPage() {
     if (!d) return `${comp.quantity || 1}No.`;
 
     const qty = comp.quantity || 1;
+    const unit = qty > 1 ? 'Nos.' : 'No.';
 
-    return `${qty}No${qty > 1 ? 's' : ''}. ${d.amperage || ''} ${d.poles || ''} ${d.category || ''} ${d.manufacturer || ''}`;
+    const name = d.item || '';
+
+    const fallback = `${d.amperage || ''} ${d.poles || ''} ${d.category || ''}`.trim();
+
+    const make = d.manufacturer || '';
+
+    return `${qty}${unit} ${name || fallback} ${make}`.trim();
   };
   return (
     <>
@@ -339,11 +346,32 @@ export default function QuotationPDFPage() {
                   <div className="item-label">Control/Instrument:</div>
                   <div className="item-value">
                     <div className="component-list">
-                      {accessories.map((acc: any, idx: number) => (
-                        <div key={idx} className="component-item">
-                          {acc.quantity}No{acc.quantity > 1 ? 's' : ''}. {acc.description || acc.item}
-                        </div>
-                      ))}
+                      {accessories.map((acc: any, idx: number) => {
+                        const d = acc.details;
+                        const qty = acc.quantity || 1;
+
+                        if (!d) {
+                          return (
+                            <div key={idx} className="component-item">
+                              {qty}No{qty > 1 ? 's' : ''}.
+                            </div>
+                          );
+                        }
+
+                        // Build smart description
+                        const parts = [
+                          d.amperage,
+                          d.category,
+                          d.poles ? `${d.poles}pole` : '',
+                          d.manufacturer
+                        ].filter(Boolean);
+
+                        return (
+                          <div key={idx} className="component-item">
+                            {qty}No{qty > 1 ? 's' : ''}. {parts.join(' ')}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
