@@ -18,9 +18,15 @@ export function formatCurrency(
   amount: number,
   currency: string = 'NGN'
 ): string {
+  // ✅ whitelist valid currencies
+  const validCurrencies = ['NGN', 'USD', 'EUR'];
+  const safeCurrency = validCurrencies.includes(currency || '')
+    ? currency!
+    : 'NGN'; // fallback
+
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
-    currency,
+    currency: safeCurrency,
     minimumFractionDigits: 2,
   }).format(amount);
 }
