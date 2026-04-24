@@ -5,6 +5,7 @@
 // ============================================
 
 import { QuoteRow, QuoteItemRow, ClientRow, ComponentRow, UserRow } from './database.types';
+import { calculatePanel, type BusbarCalculation, type CableCalculation, type MainBusbarCalculation } from '@/lib/calculations/panelCalculator';
 import { Json } from './database.types';
 
 // ============================================
@@ -29,6 +30,10 @@ export enum QuotationStatus {
  */
 export interface Quote extends QuoteRow {
   version?: number;
+  include_images?: boolean;
+  include_warranty?: boolean;
+  include_specs?: boolean;
+  warranty_period?: string;
 }
 
 /**
@@ -45,6 +50,39 @@ export type PanelType =
 
 export interface QuoteItem extends QuoteItemRow {
   panel_type: PanelType | null; // ✅ FIXED
+  id: string;
+  panel_name: string;
+  busbar_amperage: string | null;
+  incomers: Array<{
+    component_id: string;
+    quantity: number;
+    price: number;
+    amperage?: number;
+    poles?: number
+  }>;
+  outgoings: Array<{
+    component_id: string;
+    quantity: number;
+    price: number;
+    amperage?: number;
+    poles?: number
+  }>;
+  accessories: Array<{
+    component_id: string;
+    quantity: number;
+    price: number
+  }>;
+  enclosure_dimensions: string;
+  enclosure_height: number; // in mm
+  enclosure_width: number; // in mm
+  enclosure_depth: number; // in mm
+  enclosure_price: number;
+  // NEW: Busbar sections
+  main_busbar: BusbarCalculation | null;
+  link_busbars: BusbarCalculation[];
+  // NEW: Cable section
+  cables: CableCalculation[];
+  subtotal: number;
 }
 
 /**
@@ -161,7 +199,9 @@ export interface QuoteItemPricing {
   panel_name: string;
   subtotal: number;
   components: {
-    busbar: number;
+    main_busbar: number;
+    link_busbar: number;
+    cables: number;
     enclosure: number;
     components_total: number;
   };
@@ -187,6 +227,19 @@ export interface CreateQuoteDTO {
   items: CreateQuoteItemDTO[];
 }
 
+export type BusbarRating =
+  | '400A'
+  | '630A'
+  | '800A'
+  | '1000A'
+  | '1600A'
+  | '2000A'
+  | '2500A'
+  | '3200A'
+  | '4000A'
+  | '5000A'
+  | '6300A';
+
 /**
  * Create Quote Item DTO
  */
@@ -197,13 +250,20 @@ export interface CreateQuoteItemDTO {
   panel_type?: PanelType;
   
   // Busbar details
-  busbar_type?: string;
+  busbar_type?: BusbarRating;
   busbar_specification?: string;
   busbar_amperage?: string;
   busbar_price?: number;
   busbar_link_type?: string;
   busbar_link_specification?: string;
-  cable_link_size?: string;
+  busbar_quantity_meters?: number;
+  cable_size?: string;
+  busbar_price_per_meter?: number;
+  busbar_link_quantity_meters?: number;
+  busbar_link_price_per_meter?: number;
+  cable_quantity_meters?: number;
+  cable_price_per_meter?: number;
+
   
   // Enclosure
   enclosure_dimensions?: string;

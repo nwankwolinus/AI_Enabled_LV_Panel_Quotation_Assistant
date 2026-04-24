@@ -1,4 +1,4 @@
-import { Quotation, QuotationItem } from "@/types/quotation.types";
+import { Quote, QuoteItem } from "@/types/quotation.types";
 import { v4 as uuidv4 } from "uuid";
 
 export interface QuotationTemplate {
@@ -17,9 +17,8 @@ export class QuotationFactory {
         template: QuotationTemplate,
         clientId: string,
         userId: string
-    ): Partial<Quotation> {
+    ): Partial<Quote> {
         const baseQuotation = {
-            id: uuidv4(),
             client_id: clientId,
             created_by: userId,
             status: "draft" as const,
@@ -32,30 +31,30 @@ export class QuotationFactory {
             case 'minimal':
                 return {
                     ...baseQuotation,
-                    title: "Quick Quote",
-                    validity_days: 7,
+                    project_name: "Quick Quote",
+                    validity_period: "7 days",
                     payment_terms: "80% upfront, 20% on completion before delivery",
-                    delivery_timeline: "2-3 weeks",
+                    execution_period: "2-3 weeks",
                 };
             case 'standard':
                 return {
                     ...baseQuotation,
-                    title: "Detailed Quotation",
-                    validity_days: 30,
+                    project_name: "Detailed Quotation",
+                    validity_period: "30 days",
                     payment_terms: "80% upfront, 20% on completion before delivery",
-                    delivery_timeline: "4-6 weeks",
-                    include_images: true,
+                    execution_period: "4-6 weeks",
+                    include_images: template.includeImages,
                     include_warranty: template.includeWarranty,
                     warranty_period: "12 months",
                 };
             case 'detailed':
                 return {
                     ...baseQuotation,
-                    title: "Detailed Quotation",
-                    vailidity_days: 30,
+                    project_name: "Detailed Quotation",
+                    validity_period: "30 days",
                     payment_terms: "80% upfront, 20% on completion before delivery",
-                    delivery_timeline: "6-8 weeks",
-                    include_images: true,
+                    execution_period: "6-8 weeks",
+                    include_images: template.includeImages,
                     include_warranty: template.includeWarranty,
                     warranty_period: "12 months",
 
@@ -66,11 +65,18 @@ export class QuotationFactory {
         }
     }
 
-    static createRevision(original: Quotation): Partial<Quotation> {
+    static createRevision(original: Quote): Partial<Quote> {
         return {
-            ...original,
-            id: uuidv4(),
-            version: original.version + 1,
+            client_id: original.client_id,
+            client_name: original.client_name,
+            client_address: original.client_address,
+            attention: original.attention,
+            project_name: original.project_name,
+            payment_terms: original.payment_terms,
+            validity_period: original.validity_period,
+            execution_period: original.execution_period,
+            notes: original.notes,
+            version: (original.version || 1) + 1,
             status: "draft",
             parent_quote_id: original.id,
             created_at: new Date().toISOString(),

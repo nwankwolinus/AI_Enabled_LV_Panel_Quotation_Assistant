@@ -5,7 +5,7 @@ import { Original_Surfer } from "next/font/google";
 
 export class QuotationRepository extends BaseRepository<Quote> {
     constructor(supabase: SupabaseClient) {
-        super(supabase, "quotations");
+        super(supabase, "quotes");
     }
 
     // custom method: Find quotations with all relations
@@ -15,7 +15,7 @@ export class QuotationRepository extends BaseRepository<Quote> {
             .select(`
                 *,
                 client:clients(*),
-                items:quotation_items(
+                items:quote_items(
                     *,
                     component:components(*)
                 ),
@@ -105,7 +105,7 @@ export class QuotationRepository extends BaseRepository<Quote> {
             }));
 
             await this.supabase
-              .from("quotation_items")
+              .from("quote_items")
               .insert(itemsToInsert);   
         }
 

@@ -1,7 +1,7 @@
 // ============================================
-// CREATE QUOTATION PAGE - WITH AUTO QUOTE NUMBER
+// CREATE QUOTATION PAGE - WITH BUSBAR & CABLE AUTO-CALC
 // File: src/app/dashboard/quotations/create/page.tsx
-// FIXED: Added auto quote number generation
+// NEW: Added Main Busbar, Link Busbar, and Cable sections with auto-calculations
 // ============================================
 
 'use client';
@@ -9,33 +9,23 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout, Button, Input, Label, Select, Textarea, Card } from '@/components';
-import { Save, Plus, Trash2, Search, RefreshCw } from 'lucide-react';
+import { Save, Plus, Trash2, Search, RefreshCw, Calculator } from 'lucide-react';
 import { useComponents } from '@/hooks/useComponents';
 import { useClients } from '@/hooks/useClients';
 import { useCreateQuotation } from '@/hooks/useQuotations';
 import { useUIStore } from '@/store/useUIStore';
 import ComponentSearchModal from '@/components/forms/ComponentSearchModal';
 import { generateUniqueQuoteNumber } from '@/lib/utils';
+import { QuoteItem } from '@/types/quotation.types';
+import { calculatePanel } from '@/lib/calculations/panelCalculator';
 
 type PanelType = 'isolator' | 'changeover' | 'synch_panel' | 'lv_panel' | 'custom';
-interface QuoteItem {
-  id: string;
-  panel_type: PanelType | null;
-  panel_name: string;
-  busbar_amperage?: string;
-  incomers: Array<{ component_id: string; quantity: number; price: number }>;
-  outgoings: Array<{ component_id: string; quantity: number; price: number }>;
-  accessories: Array<{ component_id: string; quantity: number; price: number }>;
-  enclosure_dimensions: string;
-  enclosure_price: number;
-  subtotal: number;
-}
 
 export default function CreateQuotationPage() {
   const router = useRouter();
   const { showToast } = useUIStore();
   const createQuotation = useCreateQuotation();
-  
+
   // Fetch data
   const { data: clients } = useClients();
   const { data: components } = useComponents();
@@ -56,29 +46,55 @@ export default function CreateQuotationPage() {
   const [items, setItems] = useState<QuoteItem[]>([
     {
       id: crypto.randomUUID(),
-      panel_type: 'lv_panel', // default
+      panel_type: 'lv_panel',
       panel_name: '',
       busbar_amperage: '',
       incomers: [],
       outgoings: [],
       accessories: [],
       enclosure_dimensions: '',
+      enclosure_height: 0,
+      enclosure_width: 0,
+      enclosure_depth: 0,
       enclosure_price: 0,
+      main_busbar: null,
+      link_busbars: [],
+      cables: [],
       subtotal: 0,
+      bolts: null,
+      busbar_link_specification: null,
+      busbar_link_type: null,
+      busbar_price: null,
+      busbar_specification: null,
+      busbar_type: null,
+      cable_link_size: null,
+      capacitor_bank_25kvar: null,
+      capacitor_bank_60kvar: null,
+      comap_amf_16: null,
+      comap_amf_9: null,
+      comap_intelligent_200: null,
+      contactor_battery_charger: null,
+      created_at: null,
+      digital_meter: null,
+      item_number: 0,
+      notes: null,
+      others: null,
+      power_factor_controller_12stage: null,
+      quote_id: '',
+      surge_arrester: null,
+      updated_at: null
     },
   ]);
 
-  // ✅ FIXED: Added quote number state and generation
   const [quoteNumber, setQuoteNumber] = useState('');
   const [isGeneratingQuoteNumber, setIsGeneratingQuoteNumber] = useState(false);
-
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchingFor, setSearchingFor] = useState<{
     itemIndex: number;
     type: 'incomer' | 'outgoing' | 'accessory';
   } | null>(null);
 
-  // ✅ FIXED: Generate quote number on mount
+  // Generate quote number on mount
   useEffect(() => {
     const generateNumber = async () => {
       setIsGeneratingQuoteNumber(true);
@@ -92,11 +108,9 @@ export default function CreateQuotationPage() {
         setIsGeneratingQuoteNumber(false);
       }
     };
-
     generateNumber();
   }, [showToast]);
 
-  // ✅ FIXED: Regenerate quote number handler
   const handleRegenerateQuoteNumber = async () => {
     setIsGeneratingQuoteNumber(true);
     try {
@@ -110,19 +124,82 @@ export default function CreateQuotationPage() {
     }
   };
 
-  // Calculate totals
+  // ============================================
+  // BUSBAR & CABLE CALCULATION FUNCTIONS
+  // ============================================
+
+  /**
+   * Auto-calculate busbar and cable when item changes
+   */
+  /**
+ * Auto-calculate busbar and cable using the calculation engine
+ */
+  const autoCalculateBusbarAndCable = (item: QuoteItem): QuoteItem => {
+    const updatedItem = { ...item };
+    updatedItem.subtotal = calculateItemSubtotal(updatedItem);
+
+    // Skip if no components loaded yet
+    if (!components || components.length === 0) {
+      return updatedItem;
+    }
+
+    // Run calculation engine
+    const result = calculatePanel({
+      enclosure_height: item.enclosure_height,
+      enclosure_width: item.enclosure_width,
+      busbar_amperage: item.busbar_amperage || undefined,
+      incomers: item.incomers,
+      outgoings: item.outgoings,
+      components: components?.map(c => ({
+        ...c,
+        category: c.category || undefined,
+        amperage: c.amperage || undefined,
+      })) || [],
+    });
+
+    // Update item with calculated results
+    updatedItem.main_busbar = result.main_busbar ? {
+      ...result.main_busbar,
+      quantity_meters: result.main_busbar.meters,
+    } : null;
+    updatedItem.link_busbars = result.link_busbars.map(busbar => ({
+      ...busbar,
+      quantity_meters: busbar.meters,
+    }));
+    updatedItem.cables = result.cables.map(cable => ({
+      ...cable,
+      quantity_meters: cable.meters,
+    }));
+
+    return updatedItem;
+  };
+  // Calculate item subtotal
   const calculateItemSubtotal = (item: QuoteItem) => {
     const incomersTotal = item.incomers.reduce((sum, c) => sum + (c.price * c.quantity), 0);
     const outgoingsTotal = item.outgoings.reduce((sum, c) => sum + (c.price * c.quantity), 0);
     const accessoriesTotal = item.accessories.reduce((sum, c) => sum + (c.price * c.quantity), 0);
-    return incomersTotal + outgoingsTotal + accessoriesTotal + item.enclosure_price;
+
+    // ✅ CHANGED: Main busbar
+    const mainBusbarTotal = item.main_busbar?.total || 0;
+
+    // ✅ CHANGED: Sum all link busbars
+    const linkBusbarsTotal = item.link_busbars?.reduce((sum, b) => sum + b.total, 0) || 0;
+
+    // ✅ CHANGED: Sum all cables
+    const cablesTotal = item.cables?.reduce((sum, c) => sum + c.total, 0) || 0;
+
+    return incomersTotal + outgoingsTotal + accessoriesTotal +
+      mainBusbarTotal + linkBusbarsTotal + cablesTotal + item.enclosure_price;
   };
 
   const grandTotal = items.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
-  const vat = grandTotal * 0.075; // 7.5% VAT
+  const vat = grandTotal * 0.075;
   const totalWithVAT = grandTotal + vat;
 
-  // Handlers
+  // ============================================
+  // HANDLERS
+  // ============================================
+
   const handleClientChange = (clientId: string) => {
     const client = clients?.find(c => c.id === clientId);
     if (client) {
@@ -147,8 +224,36 @@ export default function CreateQuotationPage() {
         outgoings: [],
         accessories: [],
         enclosure_dimensions: '',
+        enclosure_height: 0,
+        enclosure_width: 0,
+        enclosure_depth: 0,
         enclosure_price: 0,
+        main_busbar: null,
+        link_busbars: [],
+        cables: [],
         subtotal: 0,
+        bolts: null,
+        busbar_link_specification: null,
+        busbar_link_type: null,
+        busbar_price: null,
+        busbar_specification: null,
+        busbar_type: null,
+        cable_link_size: null,
+        capacitor_bank_25kvar: null,
+        capacitor_bank_60kvar: null,
+        comap_amf_16: null,
+        comap_amf_9: null,
+        comap_intelligent_200: null,
+        contactor_battery_charger: null,
+        created_at: null,
+        digital_meter: null,
+        item_number: 0,
+        notes: null,
+        others: null,
+        power_factor_controller_12stage: null,
+        quote_id: '',
+        surge_arrester: null,
+        updated_at: null
       },
     ]);
   };
@@ -163,7 +268,37 @@ export default function CreateQuotationPage() {
 
   const updateItem = (index: number, field: keyof QuoteItem, value: any) => {
     const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
+    let updatedItem = { ...newItems[index], [field]: value };
+
+    // Auto-recalculate when relevant fields change
+    if (field === 'enclosure_dimensions' || field === 'enclosure_width' ||
+      field === 'enclosure_height' || field === 'busbar_amperage' ||
+      field === 'incomers' || field === 'outgoings') {
+      updatedItem = autoCalculateBusbarAndCable(updatedItem);
+    }
+
+    newItems[index] = updatedItem;
+    setItems(newItems);
+  };
+
+  /**
+   * Parse enclosure dimensions and update width/height/depth
+   */
+  const handleEnclosureDimensionsChange = (index: number, value: string) => {
+    const newItems = [...items];
+    newItems[index].enclosure_dimensions = value;
+
+    // Parse dimensions: "2000 x 800 x 600" or "2000x800x600"
+    const match = value.match(/(\d+)\s*x\s*(\d+)\s*x\s*(\d+)/i);
+    if (match) {
+      newItems[index].enclosure_height = parseInt(match[1]);
+      newItems[index].enclosure_width = parseInt(match[2]);
+      newItems[index].enclosure_depth = parseInt(match[3]);
+
+      // Auto-calculate busbar
+      newItems[index] = autoCalculateBusbarAndCable(newItems[index]);
+    }
+
     setItems(newItems);
   };
 
@@ -179,25 +314,46 @@ export default function CreateQuotationPage() {
     const item = items[itemIndex];
     const array = item[type === 'incomer' ? 'incomers' : type === 'outgoing' ? 'outgoings' : 'accessories'];
 
-    // Check if component already added
     if (array.some(c => c.component_id === component.id)) {
       showToast('Component already added to this section', 'warning');
       return;
     }
 
+    // Extract amperage and poles from component (you may need to adjust this based on your data structure)
+    const amperage = extractAmperageFromComponent(component);
+    const poles = extractPolesFromComponent(component);
+
     const newComponent = {
       component_id: component.id,
       quantity: 1,
       price: component.price,
+      amperage,
+      poles,
     };
 
-    updateItem(itemIndex, 
+    updateItem(itemIndex,
       type === 'incomer' ? 'incomers' : type === 'outgoing' ? 'outgoings' : 'accessories',
       [...array, newComponent]
     );
 
     setIsSearchModalOpen(false);
     setSearchingFor(null);
+  };
+
+  // Helper functions to extract amperage and poles from component
+  const extractAmperageFromComponent = (component: any): number | undefined => {
+  if (component.amperage) return parseInt(component.amperage);
+
+  const match =
+    component.item?.match(/(\d+)\s*A/i) ||
+    component.category?.match(/(\d+)\s*A/i);
+
+  return match ? parseInt(match[1]) : undefined;
+};
+  const extractPolesFromComponent = (component: any): number | undefined => {
+    // Try to extract poles from model or specification
+    const match = component.item?.match(/(\d+)P/) || component.category?.match(/(\d+)P/);
+    return match ? parseInt(match[1]) : undefined;
   };
 
   const removeComponent = (itemIndex: number, type: 'incomer' | 'outgoing' | 'accessory', componentIndex: number) => {
@@ -208,8 +364,8 @@ export default function CreateQuotationPage() {
   };
 
   const updateComponentQuantity = (
-    itemIndex: number, 
-    type: 'incomer' | 'outgoing' | 'accessory', 
+    itemIndex: number,
+    type: 'incomer' | 'outgoing' | 'accessory',
     componentIndex: number,
     quantity: number
   ) => {
@@ -223,7 +379,6 @@ export default function CreateQuotationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ FIXED: Validate quote number
     if (!quoteNumber) {
       showToast('Quote number is required', 'error');
       return;
@@ -241,23 +396,42 @@ export default function CreateQuotationPage() {
 
     try {
       const quotationData = {
-        quote_number: quoteNumber, // ✅ FIXED: Use generated quote number
+        quote_number: quoteNumber,
         ...formData,
         total: grandTotal,
         vat,
         grand_total: totalWithVAT,
         status: 'draft',
         items: items.map((item, index) => ({
-          item_number: index + 1,
-          panel_name: item.panel_name,
-          busbar_amperage: item.busbar_amperage,
-          incomers: item.incomers,
-          outgoings: item.outgoings,
-          accessories: item.accessories,
-          enclosure_dimensions: item.enclosure_dimensions,
-          enclosure_price: item.enclosure_price,
-          subtotal: calculateItemSubtotal(item),
-        })),
+        item_number: index + 1,
+        panel_name: item.panel_name,
+        busbar_amperage: item.busbar_amperage || undefined,
+        incomers: item.incomers,
+        outgoings: item.outgoings,
+        accessories: item.accessories,
+        enclosure_dimensions: item.enclosure_dimensions,
+        enclosure_price: item.enclosure_price,
+  
+        // ✅ Main busbar data
+        busbar_type: item.main_busbar?.size || null,
+        busbar_specification: item.main_busbar ? `${item.main_busbar.meters.toFixed(2)}m` : null,
+        busbar_price: item.main_busbar?.total || null,
+  
+        // ✅ Link busbars (store as JSON array or summary)
+        busbar_link_type: item.link_busbars.length > 0 
+          ? item.link_busbars.map(b => b.size).join(', ') 
+          : null,
+        busbar_link_specification: item.link_busbars.length > 0
+          ? item.link_busbars.map(b => `${b.size}: ${b.meters.toFixed(2)}m`).join('; ')
+          : null,
+  
+        // ✅ Cables (store as JSON array or summary)
+        cable_link_size: item.cables.length > 0
+            ? item.cables.map(c => c.size).join(', ')
+        : null,
+  
+  subtotal: calculateItemSubtotal(item),
+})),
       };
 
       await createQuotation.mutateAsync(quotationData);
@@ -265,8 +439,7 @@ export default function CreateQuotationPage() {
       router.push('/dashboard/quotations');
     } catch (error: any) {
       console.error('Error creating quotation:', error);
-      
-      // ✅ FIXED: Handle duplicate quote number error
+
       if (error?.code === '23505') {
         showToast('Quote number conflict. Generating new number...', 'warning');
         await handleRegenerateQuoteNumber();
@@ -289,9 +462,9 @@ export default function CreateQuotationPage() {
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              className="bg-ppl-navy" 
+            <Button
+              type="submit"
+              className="bg-ppl-navy"
               disabled={createQuotation.isPending || isGeneratingQuoteNumber || !quoteNumber}
             >
               <Save className="w-4 h-4 mr-2" />
@@ -300,7 +473,7 @@ export default function CreateQuotationPage() {
           </div>
         </div>
 
-        {/* ✅ FIXED: Quote Number Section */}
+        {/* Quote Number Section */}
         <Card className="p-6 bg-blue-50 border-blue-200">
           <h2 className="text-xl font-semibold mb-4 text-blue-900">Quote Number</h2>
           <div className="flex gap-2">
@@ -325,16 +498,15 @@ export default function CreateQuotationPage() {
             </Button>
           </div>
           <p className="text-sm text-blue-700 mt-2 font-medium">
-            {isGeneratingQuoteNumber 
-              ? '⏳ Generating unique quote number...' 
-              : quoteNumber 
-                ? '✅ Quote number ready - Sequential from database' 
+            {isGeneratingQuoteNumber
+              ? '⏳ Generating unique quote number...'
+              : quoteNumber
+                ? '✅ Quote number ready - Sequential from database'
                 : '⚠️ Click regenerate to get a quote number'
             }
           </p>
         </Card>
 
-       
         {/* Client Information */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Client Information</h2>
@@ -392,7 +564,7 @@ export default function CreateQuotationPage() {
           <div className="space-y-6">
             {items.map((item, itemIndex) => (
               <div key={item.id} className="border border-gray-200 rounded-lg p-4 space-y-4">
-                {/* Panel Header */}
+                {/* PANEL HEADER */}
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">Panel {itemIndex + 1}</h3>
                   {items.length > 1 && (
@@ -408,14 +580,14 @@ export default function CreateQuotationPage() {
                   )}
                 </div>
 
-                {/* Panel Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* PANEL DETAILS */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label>Panel Type *</Label>
                     <Select
                       required
                       value={item.panel_type || ''}
-                      onChange={(e) => updateItem(itemIndex, 'panel_type', e.target.value)}
+                      onChange={(e) => updateItem(itemIndex, 'panel_type', e.target.value as PanelType)}
                     >
                       <option value="">Select</option>
                       <option value="isolator">Isolator</option>
@@ -438,8 +610,8 @@ export default function CreateQuotationPage() {
                     <Label>Busbar Amperage *</Label>
                     <Select
                       required
-                      value={item.busbar_amperage}
-                      onChange={(e) => updateItem(itemIndex, 'busbar_amperage', e.target.value)}
+                      value={item.busbar_amperage || ''}
+                      onChange={(e) => updateItem(itemIndex, 'busbar_amperage', e.target.value as string)}
                     >
                       <option value="">Select</option>
                       <option value="400A">400A</option>
@@ -455,7 +627,7 @@ export default function CreateQuotationPage() {
                   </div>
                 </div>
 
-                {/* Components Sections */}
+                {/* COMPONENTS SECTIONS */}
                 {item.panel_type !== 'isolator' && (
                   <ComponentSection
                     title="Incomers"
@@ -466,46 +638,19 @@ export default function CreateQuotationPage() {
                     onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'incomer', idx, qty)}
                   />
                 )}
-                {item.panel_type === 'lv_panel' && (
-                  <ComponentSection
-                    title="Outgoings"
-                    components={item.outgoings}
-                    allComponents={components || []}
-                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
-                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
-                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
-                  />
-                )}
-                {item.panel_type === 'changeover' && (
-                  <ComponentSection
-                    title="Outgoings"
-                    components={item.outgoings}
-                    allComponents={components || []}
-                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
-                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
-                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
-                  />
-                )}
-                {item.panel_type === 'synch_panel' && (
-                  <ComponentSection
-                    title="Outgoings"
-                    components={item.outgoings}
-                    allComponents={components || []}
-                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
-                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
-                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
-                  />
-                )}
-                {item.panel_type === 'custom' && (
-                  <ComponentSection
-                    title="Outgoings"
-                    components={item.outgoings}
-                    allComponents={components || []}
-                    onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
-                    onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
-                    onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
-                  />
-                )}
+
+                {(item.panel_type === 'lv_panel' || item.panel_type === 'changeover' ||
+                  item.panel_type === 'synch_panel' || item.panel_type === 'custom') && (
+                    <ComponentSection
+                      title="Outgoings"
+                      components={item.outgoings}
+                      allComponents={components || []}
+                      onAdd={() => openComponentSearch(itemIndex, 'outgoing')}
+                      onRemove={(idx) => removeComponent(itemIndex, 'outgoing', idx)}
+                      onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'outgoing', idx, qty)}
+                    />
+                  )}
+
                 {item.panel_type && (
                   <ComponentSection
                     title="Accessories"
@@ -516,29 +661,163 @@ export default function CreateQuotationPage() {
                     onUpdateQuantity={(idx, qty) => updateComponentQuantity(itemIndex, 'accessory', idx, qty)}
                   />
                 )}
-                {/* Enclosure */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                  <div>
-                    <Label>Enclosure Dimensions</Label>
-                    <Input
-                      value={item.enclosure_dimensions}
-                      onChange={(e) => updateItem(itemIndex, 'enclosure_dimensions', e.target.value)}
-                      placeholder="e.g., 2000 x 1200 x 600mm"
-                    />
-                  </div>
-                  <div>
-                    <Label>Enclosure Price (NGN)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={item.enclosure_price}
-                      onChange={(e) => updateItem(itemIndex, 'enclosure_price', parseFloat(e.target.value) || 0)}
-                      placeholder="0.00"
-                    />
+
+                {/* ENCLOSURE */}
+                <div className="pt-4 border-t">
+                  <h4 className="font-semibold mb-3">Enclosure</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Dimensions (H x W x D in mm) *</Label>
+                      <Input
+                        required
+                        value={item.enclosure_dimensions}
+                        onChange={(e) => handleEnclosureDimensionsChange(itemIndex, e.target.value)}
+                        placeholder="e.g., 2000 x 800 x 600"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Format: Height x Width x Depth (e.g., 2000 x 800 x 600)
+                      </p>
+                    </div>
+                    <div>
+                      <Label>Enclosure Price (₦)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.enclosure_price}
+                        onChange={(e) => updateItem(itemIndex, 'enclosure_price', parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Item Subtotal */}
+                {/* BUSBAR SECTIONS */}
+                {item.main_busbar || item.busbar_amperage ? (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calculator className="w-5 h-5 text-blue-600" />
+                      <h4 className="font-semibold">Main Busbar (Auto-calculated)</h4>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <Label className="text-sm">Amperage</Label>
+                          <Input
+                            value={item.busbar_amperage || ''}
+                            disabled
+                            className="bg-gray-100"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm">Quantity (meters)</Label>
+                          <Input
+                            value={item.main_busbar ? item.main_busbar.meters.toFixed(2) : '0.00'}
+                            disabled
+                            className="bg-gray-100"
+                          />
+                          <p className="text-xs text-gray-600 mt-1">
+                            {item.enclosure_height > 0 && item.enclosure_height < 1600
+                              ? '0.5m × 4'
+                              : `${(item.enclosure_width / 1000).toFixed(2)}m × 4`
+                            }
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-sm">Price/Meter (₦)</Label>
+                          <Input
+                            value= {item.main_busbar?.price_per_meter ? item.main_busbar.price_per_meter.toLocaleString() : '0'}
+                            disabled
+                            className="bg-gray-100"                          
+                          />
+                          <p className="text-xs text-gray-600 mt-1">Auto from DB</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm">Total (₦)</Label>
+                          <Input
+                            value={item.main_busbar?.total
+                              ? item.main_busbar.total.toLocaleString()
+                              : '0'}
+                            disabled
+                            className="bg-gray-100 font-semibold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {item.link_busbars && item.link_busbars.length > 0 && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calculator className="w-5 h-5 text-green-600" />
+                      <h4 className="font-semibold">Link Busbars (Auto-calculated for 400A+)</h4>
+                    </div>
+                    <div className="space-y-2">
+                      {item.link_busbars.map((busbar, idx) => (
+                        <div key={idx} className="bg-green-50 p-4 rounded-lg">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                              <Label className="text-sm">Size</Label>
+                              <Input value={busbar.size} disabled className="bg-gray-100 font-medium" />
+                            </div>
+                            <div>
+                              <Label className="text-sm">Quantity (meters)</Label>
+                              <Input value={busbar.meters.toFixed(2)} disabled className="bg-gray-100" />
+                              <p className="text-xs text-gray-600 mt-1">1.5 × poles × qty</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm">Price/Meter (₦)</Label>
+                              <Input value={busbar.price_per_meter.toLocaleString()} disabled className="bg-gray-100" />
+                              <p className="text-xs text-gray-600 mt-1">Auto from DB</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm">Total (₦)</Label>
+                              <Input value={busbar.total.toLocaleString()} disabled className="bg-gray-100 font-semibold" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* CABLE SECTION */}
+                {item.cables && item.cables.length > 0 && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calculator className="w-5 h-5 text-orange-600" />
+                      <h4 className="font-semibold">Cables (Auto-calculated for ≤250A)</h4>
+                    </div>
+                    <div className="space-y-2">
+                      {item.cables.map((cable, idx) => (
+                        <div key={idx} className="bg-orange-50 p-4 rounded-lg">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                              <Label className="text-sm">Size</Label>
+                              <Input value={cable.size} disabled className="bg-gray-100 font-medium" />
+                            </div>
+                            <div>
+                              <Label className="text-sm">Quantity (meters)</Label>
+                              <Input value={cable.meters.toFixed(2)} disabled className="bg-gray-100" />
+                              <p className="text-xs text-gray-600 mt-1">1.5 × poles × qty</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm">Price/Meter (₦)</Label>
+                              <Input value={cable.price_per_meter.toLocaleString()} disabled className="bg-gray-100" />
+                              <p className="text-xs text-gray-600 mt-1">Auto from DB</p>
+                            </div>
+                            <div>
+                              <Label className="text-sm">Total (₦)</Label>
+                              <Input value={cable.total.toLocaleString()} disabled className="bg-gray-100 font-semibold" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ITEM SUBTOTAL */}
                 <div className="text-right font-semibold text-lg pt-4 border-t">
                   Panel Subtotal: ₦{calculateItemSubtotal(item).toLocaleString()}
                 </div>
@@ -639,7 +918,7 @@ function ComponentSection({
   onUpdateQuantity,
 }: {
   title: string;
-  components: Array<{ component_id: string; quantity: number; price: number }>;
+  components: Array<{ component_id: string; quantity: number; price: number; amperage?: number; poles?: number }>;
   allComponents: any[];
   onAdd: () => void;
   onRemove: (idx: number) => void;
@@ -666,6 +945,11 @@ function ComponentSection({
                   <p className="text-sm font-medium">{fullComp?.item || 'Unknown'}</p>
                   <p className="text-xs text-gray-500">
                     {fullComp?.model} - ₦{comp.price.toLocaleString()} each
+                    {comp.amperage && comp.poles && (
+                      <span className="ml-2 text-blue-600">
+                        ({comp.amperage}A, {comp.poles}P)
+                      </span>
+                    )}
                   </p>
                 </div>
                 <Input
